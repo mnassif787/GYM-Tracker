@@ -11,6 +11,7 @@ import {
   saveExercise as dbSaveExercise,
 } from '@/lib/db'
 import { DEFAULT_EXERCISES, getRecommendedWeight } from '@/lib/exercises'
+import { generateDemoWorkouts } from '@/lib/demoData'
 
 interface WorkoutContextValue {
   // State
@@ -33,6 +34,7 @@ interface WorkoutContextValue {
   // Exercise management (admin)
   saveExercise: (exercise: Exercise) => Promise<void>
   setAdminMode: (value: boolean) => void
+  loadDemoData: () => Promise<void>
 }
 
 const WorkoutContext = createContext<WorkoutContextValue | null>(null)
@@ -194,6 +196,19 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     toast.success(`${exercise.name} updated.`)
   }, [])
 
+  const loadDemoData = useCallback(async () => {
+    const demos = generateDemoWorkouts()
+    await Promise.all(demos.map((w) => saveWorkout(w)))
+    setWorkoutHistory((prev) =>
+      [...demos, ...prev].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      ),
+    )
+    toast.success(`${demos.length} demo workouts loaded!`, {
+      description: '4 weeks of progressive training history added.',
+    })
+  }, [])
+
   const setAdminMode = useCallback((value: boolean) => {
     setIsAdminMode(value)
     // INSECURE: demo only, replace with proper authentication
@@ -222,6 +237,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         getLastWorkout,
         saveExercise,
         setAdminMode,
+        loadDemoData,
       }}
     >
       {children}

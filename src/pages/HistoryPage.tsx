@@ -1,7 +1,7 @@
 // src/pages/HistoryPage.tsx
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Download, Trophy, ChevronRight, Trash2 } from 'lucide-react'
+import { Download, Trophy, ChevronRight, Trash2, FlaskConical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,7 +9,7 @@ import { useWorkout } from '@/context/WorkoutContext'
 
 export function HistoryPage() {
   const navigate = useNavigate()
-  const { workoutHistory, deleteWorkout } = useWorkout()
+  const { workoutHistory, deleteWorkout, loadDemoData } = useWorkout()
 
   function handleExportJSON() {
     const blob = new Blob([JSON.stringify(workoutHistory, null, 2)], {
@@ -27,12 +27,18 @@ export function HistoryPage() {
     <div className="mx-auto max-w-3xl px-4 py-6 page-transition">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">History</h1>
-        {workoutHistory.length > 0 && (
-          <Button variant="outline" size="sm" onClick={handleExportJSON}>
-            <Download className="mr-2 h-4 w-4" />
-            Export JSON
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={loadDemoData}>
+            <FlaskConical className="mr-2 h-4 w-4" />
+            Load Demo
           </Button>
-        )}
+          {workoutHistory.length > 0 && (
+            <Button variant="outline" size="sm" onClick={handleExportJSON}>
+              <Download className="mr-2 h-4 w-4" />
+              Export JSON
+            </Button>
+          )}
+        </div>
       </div>
 
       {workoutHistory.length === 0 ? (
