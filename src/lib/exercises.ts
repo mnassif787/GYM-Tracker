@@ -380,3 +380,62 @@ export function getRecommendedWeight(exerciseId: string, history: Workout[]): nu
   const maxWeight = Math.max(...lastWorkout.sets.map((s) => s.weight))
   return maxWeight + 2.5
 }
+// ─── Smart per-set recommendation ────────────────────────────────────────────
+
+export interface SmartRecommendation {
+  weight: number
+  reps: number
+  sets: number
+  note: string
+  lastSets: import('./types').WorkoutSet[]
+  isProgression: boolean
+}
+
+/**
+ * Returns a data-driven recommendation for the next session based on:
+ * - Per-set history from the last workout (so Set 2 mirrors last Set 2)
+ * - Profile goal type (determines target rep range)
+ * - Progressive overload: bumps weight when target reps were hit last time
+ */
+export function getSmartRecommendation(
+  exerciseId: string,
+  history: Workout[],
+  goalType?: string,
+  fallbackSets?: number,
+  fallbackReps?: number,
+): SmartRecommendation | null {
+  const past = history
+    .filter((w) => w.exerciseId === exerciseId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  const lastWorkout = past[0]
+  if (!lastWorkout || lastWorkout.sets.length === 0) return null
+
+  const lastSets = lastWorkout.sets
+
+  // Target reps by goal
+  const targetReps =
+    goalType === 'strength' ? 5
+    : goalType === 'hypertrophy' ? 10
+    : goalType === 'fat-loss' || goalType === 'toning' ? 15
+    : fallbackReps ?? lastSets[0]?.reps ?? 10
+
+  const avgWeight = lastSets.reduce((a, s) => a + s.weight, 0) / lastSets.length
+  const hitAllReps = lastSets.every((s) => s.reps >= targetReps)
+  // Progressive overload increment depends on goal (heavier lifts need smaller jumps)
+  const increment = avgWeight >= 100 ? 2.5 : avgWeight >= 60 ? 2.5 : 1.25
+  const suggestedWeight = hitAllReps
+    ? Math.round((avgWeight + increment) * 4) / 4   // round to nearest 0.25
+    : Math.round(avgWeight * 4) / 4
+
+  return {
+    weight: suggestedWeight,
+    reps: targetReps,
+    sets: fallbackSets ?? lastSets.length,
+    note: hitAllReps
+      ? `You hit all reps last time (avg ${avgWeight.toFixed(1)}kg) — try ${suggestedWeight}kg today!`
+      : `Aim for ${targetReps} reps each set. Last avg: ${avgWeight.toFixed(1)}kg.`,
+    lastSets,
+    isProgression: hitAllReps,
+  }
+}

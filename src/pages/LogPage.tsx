@@ -1,14 +1,71 @@
 // src/pages/LogPage.tsx
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QrCode, CheckCircle2, Play } from 'lucide-react'
+import { QrCode, CheckCircle2, Play, Clock, AlertTriangle } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { WorkoutForm } from '@/components/WorkoutForm'
 import { RestTimer } from '@/components/RestTimer'
 import { useWorkout } from '@/context/WorkoutContext'
-import { getRecommendedWeight } from '@/lib/exercises'
+
+// ─── Session countdown timer ─────────────────────────────────────────────────
+function SessionTimer({ startTime, limitMin }: { startTime: Date; limitMin: number }) {
+  const [elapsed, setElapsed] = useState(0)
+  const warned5Ref = useRef(false)
+  const warned2Ref = useRef(false)
+  const warnedOverRef = useRef(false)
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const secs = Math.floor((Date.now() - startTime.getTime()) / 1000)
+      setElapsed(secs)
+      const remaining = limitMin * 60 - secs
+      if (remaining <= 300 && remaining > 0 && !warned5Ref.current) {
+        warned5Ref.current = true
+        toast.warning('5 minutes left in your session!', { duration: 6000 })
+      }
+      if (remaining <= 120 && remaining > 0 && !warned2Ref.current) {
+        warned2Ref.current = true
+        toast.warning('2 minutes left — wrap it up!', { duration: 6000 })
+      }
+      if (remaining <= 0 && !warnedOverRef.current) {
+        warnedOverRef.current = true
+        toast.error('Time limit reached! Finish your current set.', { duration: 0, id: 'time-up' })
+      }
+    }, 1000)
+    return () => clearInterval(id)
+  }, [startTime, limitMin])
+
+  const limitSecs = limitMin * 60
+  const remaining = Math.max(0, limitSecs - elapsed)
+  const pct = Math.min(1, elapsed / limitSecs)
+  const mm = String(Math.floor(remaining / 60)).padStart(2, '0')
+  const ss = String(remaining % 60).padStart(2, '0')
+  const isOver = elapsed >= limitSecs
+  const isWarning = remaining <= 120 && !isOver
+
+  return (
+    <div className="mb-4 rounded-lg border bg-card px-4 py-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5 text-sm font-medium">
+          {isOver ? <AlertTriangle className="h-4 w-4 text-destructive" /> : <Clock className="h-4 w-4 text-muted-foreground" />}
+          <span className={isOver ? 'text-destructive' : isWarning ? 'text-amber-500' : ''}>
+            {isOver ? 'Time up!' : `${mm}:${ss} remaining`}
+          </span>
+        </div>
+        <span className="text-xs text-muted-foreground">{limitMin} min limit</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${isOver ? 'bg-destructive' : isWarning ? 'bg-amber-500' : 'bg-primary'}`}
+          style={{ width: `${pct * 100}%` }}
+        />
+      </div>
+    </div>
+  )
+}
 
 export function LogPage() {
   const navigate = useNavigate()
@@ -23,9 +80,16 @@ export function LogPage() {
     pendingTemplateExercise,
     startWorkout,
     clearPendingTemplate,
+    getSmartRec,
+    profile,
+    sessionStartTime,
+    // templateQueue removed,
   } = useWorkout()
 
+  // Expose templateQueue length via context isn't needed — we just show what we have
   const [showRestTimer, setShowRestTimer] = useState(false)
+
+  const smartRec = currentExercise ? getSmartRec(currentExercise.id) : null
 
   // Show "next exercise" prompt when template queue advances
   if (!currentExercise && pendingTemplateExercise) {
@@ -41,6 +105,11 @@ export function LogPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           {pendingTemplateExercise.targetMuscles.join(', ')}
         </p>
+        {sessionStartTime && profile?.workoutTimeLimitMin && (
+          <div className="mt-4">
+            <SessionTimer startTime={sessionStartTime} limitMin={profile.workoutTimeLimitMin} />
+          </div>
+        )}
         <div className="mt-6 space-y-2">
           <Button className="w-full" onClick={() => startWorkout(pendingTemplateExercise)}>
             <Play className="h-4 w-4 mr-2" /> Start Exercise
@@ -72,16 +141,18 @@ export function LogPage() {
     )
   }
 
-  const recommendedWeight = getRecommendedWeight(currentExercise.id, workoutHistory)
-
   async function handleComplete() {
     await completeWorkout()
-    // If template queue: stay on /log so the "Up Next" screen shows
     if (!pendingTemplateExercise) navigate('/history')
   }
 
   return (
     <div className="mx-auto max-w-md px-4 py-6 page-transition">
+      {/* Session timer */}
+      {sessionStartTime && profile?.workoutTimeLimitMin && (
+        <SessionTimer startTime={sessionStartTime} limitMin={profile.workoutTimeLimitMin} />
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-start justify-between">
@@ -91,7 +162,7 @@ export function LogPage() {
               <p className="text-sm text-muted-foreground mt-0.5">
                 {[currentExercise.machineName, currentExercise.machineLocation]
                   .filter(Boolean)
-                  .join(' — ')}
+                  .join(' - ')}
               </p>
             )}
           </div>
@@ -118,14 +189,13 @@ export function LogPage() {
             onUpdateSet={updateSet}
             onRemoveSet={removeSet}
             onSetAdded={() => setShowRestTimer(true)}
-            recommendedWeight={recommendedWeight}
-            recommendedSets={currentExercise.recommendedSets}
-            recommendedReps={currentExercise.recommendedReps}
+            smartRec={smartRec}
+            currentSetIndex={currentWorkout.sets.length}
           />
         </CardContent>
       </Card>
 
-      {/* Rest timer — appears after first set is logged */}
+      {/* Rest timer */}
       {showRestTimer && (
         <div className="mb-4">
           <RestTimer onComplete={() => setShowRestTimer(false)} />
@@ -134,11 +204,7 @@ export function LogPage() {
 
       {/* Complete workout */}
       {currentWorkout.sets.length > 0 && (
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={handleComplete}
-        >
+        <Button className="w-full" size="lg" onClick={handleComplete}>
           <CheckCircle2 className="mr-2 h-5 w-5" />
           Complete Workout ({currentWorkout.sets.length} sets)
         </Button>

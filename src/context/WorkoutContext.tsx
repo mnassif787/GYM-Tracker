@@ -15,18 +15,16 @@ import {
   saveTemplate as dbSaveTemplate,
   deleteTemplate as dbDeleteTemplate,
 } from '@/lib/db'
-import { DEFAULT_EXERCISES, getRecommendedWeight } from '@/lib/exercises'
+import { DEFAULT_EXERCISES, getRecommendedWeight, getSmartRecommendation } from '@/lib/exercises'
+import type { SmartRecommendation } from '@/lib/exercises'
 import { generateDemoWorkouts } from '@/lib/demoData'
 
 interface WorkoutContextValue {
-  // State
   currentExercise: Exercise | null
   currentWorkout: Workout | null
   workoutHistory: Workout[]
   exercises: Exercise[]
   isAdminMode: boolean
-
-  // Workout actions
   startWorkout: (exercise: Exercise) => void
   addSet: (set: WorkoutSet) => void
   updateSet: (setId: string, partial: Partial<WorkoutSet>) => void
@@ -34,23 +32,22 @@ interface WorkoutContextValue {
   completeWorkout: () => Promise<void>
   clearCurrentWorkout: () => void
   deleteWorkout: (id: string) => Promise<void>
+  updateWorkout: (workout: Workout) => Promise<void>
   getLastWorkout: (exerciseId: string) => Workout | null
   importWorkouts: (data: unknown) => Promise<void>
-
-  // Exercise management (admin)
+  getSmartRec: (exerciseId: string) => SmartRecommendation | null
   saveExercise: (exercise: Exercise) => Promise<void>
   setAdminMode: (value: boolean) => void
   loadDemoData: () => Promise<void>
-
-  // Profile
   profile: UserProfile | null
   saveProfileData: (profile: UserProfile) => Promise<void>
-
-  // Templates
+  sessionStartTime: Date | null
   templates: WorkoutTemplate[]
   saveTemplateData: (template: WorkoutTemplate) => Promise<void>
   deleteTemplateData: (id: string) => Promise<void>
-  startTemplate: (template: WorkoutTemplate) => void
+  startTemplate: (template: WorkoutTemplate, startAt?: number) => void
+  resumeActiveTemplate: () => void
+  setActiveTemplate: (templateId: string | null) => Promise<void>
   pendingTemplateExercise: Exercise | null
   clearPendingTemplate: () => void
 }
@@ -70,6 +67,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [templateQueue, setTemplateQueue] = useState<Exercise[]>([])
   const [templateQueueIndex, setTemplateQueueIndex] = useState(0)
   const [pendingTemplateExercise, setPendingTemplateExercise] = useState<Exercise | null>(null)
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null)
+  const [runningTemplateId, setRunningTemplateId] = useState<string | null>(null)
+  const [runningTemplateStartIdx, setRunningTemplateStartIdx] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -97,9 +97,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       }
       setCurrentExercise(exercise)
       setCurrentWorkout(newWorkout)
+      setSessionStartTime((prev) => prev ?? new Date())
       if (recommendedWeight !== null) {
-        toast.info(`Recommended weight: ${recommendedWeight}${exercise.weightUnit ?? 'kg'}`, {
-          description: `Based on your last ${exercise.name} session + 2.5kg`,
+        toast.info(`Recommended: ${recommendedWeight}${exercise.weightUnit ?? 'kg'}`, {
+          description: `Based on your last ${exercise.name} session`,
         })
       } else {
         toast.info(`Starting ${exercise.name}`, { description: 'No previous history found.' })
@@ -144,31 +145,56 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setCurrentWorkout(null)
     setCurrentExercise(null)
 
+    // Advance active plan exercise index in profile
+    if (profile && profile.activeTemplateId && profile.activeTemplateId === runningTemplateId) {
+      const tmpl = templates.find((t) => t.id === runningTemplateId)
+      if (tmpl) {
+        const absoluteIdx = runningTemplateStartIdx + templateQueueIndex
+        const nextIdx = (absoluteIdx + 1) % tmpl.exercises.length
+        const updated = { ...profile, activeTemplateExerciseIndex: nextIdx }
+        await dbSaveProfile(updated)
+        setProfile(updated)
+      }
+    }
+
     if (templateQueue.length > 0 && templateQueueIndex < templateQueue.length - 1) {
       const nextEx = templateQueue[templateQueueIndex + 1]
       setTemplateQueueIndex((i) => i + 1)
       setPendingTemplateExercise(nextEx)
-      toast.success(isPR
-        ? `ðŸ† PR! Ready for next: ${nextEx.name}`
-        : `Exercise ${templateQueueIndex + 2}/${templateQueue.length} â€” next: ${nextEx.name}`)
+      toast.success(
+        isPR
+          ? `PR on ${currentWorkout.exerciseName}! Next: ${nextEx.name}`
+          : `Exercise ${templateQueueIndex + 2}/${templateQueue.length} done. Next: ${nextEx.name}`,
+      )
     } else if (templateQueue.length > 0) {
       setTemplateQueue([])
       setTemplateQueueIndex(0)
+      setRunningTemplateId(null)
+      setRunningTemplateStartIdx(0)
+      setSessionStartTime(null)
       setPendingTemplateExercise(null)
-      toast.success('ðŸŽ‰ Template complete! Amazing workout!', { duration: 5000 })
-    } else if (isPR) {
-      toast.success(`ðŸ† New Personal Record! ${currentMaxWeight}kg on ${currentWorkout.exerciseName}`, { duration: 5000 })
+      toast.success('Template complete! Great workout!', { duration: 5000 })
     } else {
-      toast.success(`Workout saved! ${currentWorkout.sets.length} sets logged.`)
+      setSessionStartTime(null)
+      if (isPR) {
+        toast.success(`New PR! ${currentMaxWeight}kg on ${currentWorkout.exerciseName}`, { duration: 5000 })
+      } else {
+        toast.success(`Workout saved! ${currentWorkout.sets.length} sets logged.`)
+      }
     }
-  }, [currentWorkout, workoutHistory, templateQueue, templateQueueIndex])
+  }, [currentWorkout, workoutHistory, templateQueue, templateQueueIndex, profile, runningTemplateId, runningTemplateStartIdx, templates])
 
   const clearCurrentWorkout = useCallback(() => {
     setCurrentWorkout(null); setCurrentExercise(null)
   }, [])
 
   const clearPendingTemplate = useCallback(() => {
-    setPendingTemplateExercise(null); setTemplateQueue([]); setTemplateQueueIndex(0)
+    setPendingTemplateExercise(null)
+    setTemplateQueue([])
+    setTemplateQueueIndex(0)
+    setRunningTemplateId(null)
+    setRunningTemplateStartIdx(0)
+    setSessionStartTime(null)
   }, [])
 
   const deleteWorkout = useCallback(async (id: string) => {
@@ -176,10 +202,30 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setWorkoutHistory((prev) => prev.filter((w) => w.id !== id))
   }, [])
 
+  const updateWorkout = useCallback(async (workout: Workout) => {
+    await saveWorkout(workout)
+    setWorkoutHistory((prev) =>
+      prev.map((w) => w.id === workout.id ? workout : w)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    )
+    toast.success('Workout updated.')
+  }, [])
+
   const getLastWorkout = useCallback((exerciseId: string): Workout | null => {
     return workoutHistory.filter((w) => w.exerciseId === exerciseId)
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0] ?? null
   }, [workoutHistory])
+
+  const getSmartRec = useCallback((exerciseId: string): SmartRecommendation | null => {
+    const ex = exercises.find((e) => e.id === exerciseId)
+    return getSmartRecommendation(
+      exerciseId,
+      workoutHistory,
+      profile?.goalType,
+      ex?.recommendedSets,
+      ex?.recommendedReps,
+    )
+  }, [workoutHistory, profile?.goalType, exercises])
 
   const importWorkouts = useCallback(async (data: unknown) => {
     if (!Array.isArray(data)) throw new Error('Invalid format: expected an array')
@@ -188,7 +234,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     )
     const existingIds = new Set(workoutHistory.map((w) => w.id))
     const toImport = valid.filter((w) => !existingIds.has(w.id))
-    if (toImport.length === 0) { toast.info('No new workouts â€” all already exist.'); return }
+    if (toImport.length === 0) { toast.info('No new workouts - all already exist.'); return }
     await Promise.all(toImport.map((w) => saveWorkout(w)))
     setWorkoutHistory((prev) =>
       [...prev, ...toImport].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -234,18 +280,55 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const deleteTemplateData = useCallback(async (id: string) => {
     await dbDeleteTemplate(id)
     setTemplates((prev) => prev.filter((t) => t.id !== id))
-  }, [])
+    if (profile?.activeTemplateId === id) {
+      const updated = { ...profile, activeTemplateId: undefined, activeTemplateExerciseIndex: 0 }
+      await dbSaveProfile(updated)
+      setProfile(updated)
+    }
+  }, [profile])
 
-  const startTemplate = useCallback((template: WorkoutTemplate) => {
-    const queue = template.exercises
+  const startTemplate = useCallback((template: WorkoutTemplate, startAt = 0) => {
+    const allEx = template.exercises
       .map((te) => exercises.find((e) => e.id === te.exerciseId))
       .filter((e): e is Exercise => e !== undefined)
+    const queue = allEx.slice(startAt)
     if (queue.length === 0) { toast.error('No valid exercises in this template.'); return }
     setTemplateQueue(queue)
     setTemplateQueueIndex(0)
     setPendingTemplateExercise(null)
+    setRunningTemplateId(template.id)
+    setRunningTemplateStartIdx(startAt)
     startWorkout(queue[0])
   }, [exercises, startWorkout])
+
+  const resumeActiveTemplate = useCallback(() => {
+    if (!profile?.activeTemplateId) {
+      toast.error('No active plan set. Assign one in Templates.')
+      return
+    }
+    const template = templates.find((t) => t.id === profile.activeTemplateId)
+    if (!template) { toast.error('Active plan template not found.'); return }
+    const startAt = (profile.activeTemplateExerciseIndex ?? 0) % template.exercises.length
+    toast.info(`Resuming "${template.name}" from exercise ${startAt + 1}/${template.exercises.length}`)
+    startTemplate(template, startAt)
+  }, [profile, templates, startTemplate])
+
+  const setActiveTemplate = useCallback(async (templateId: string | null) => {
+    if (!profile) { toast.error('Create your profile first.'); return }
+    const updated: UserProfile = {
+      ...profile,
+      activeTemplateId: templateId ?? undefined,
+      activeTemplateExerciseIndex: 0,
+    }
+    await dbSaveProfile(updated)
+    setProfile(updated)
+    if (templateId) {
+      const tmpl = templates.find((t) => t.id === templateId)
+      toast.success(`"${tmpl?.name ?? 'Template'}" set as your active plan.`)
+    } else {
+      toast.info('Active plan cleared.')
+    }
+  }, [profile, templates])
 
   const setAdminMode = useCallback((value: boolean) => {
     setIsAdminMode(value)
@@ -257,10 +340,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     <WorkoutContext.Provider value={{
       currentExercise, currentWorkout, workoutHistory, exercises, isAdminMode,
       startWorkout, addSet, updateSet, removeSet, completeWorkout, clearCurrentWorkout,
-      deleteWorkout, getLastWorkout, importWorkouts,
+      deleteWorkout, updateWorkout, getLastWorkout, importWorkouts, getSmartRec,
       saveExercise, setAdminMode, loadDemoData,
-      profile, saveProfileData,
+      profile, saveProfileData, sessionStartTime,
       templates, saveTemplateData, deleteTemplateData, startTemplate,
+      resumeActiveTemplate, setActiveTemplate,
       pendingTemplateExercise, clearPendingTemplate,
     }}>
       {children}

@@ -3,7 +3,8 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { User2, Scale, Ruler, Target } from 'lucide-react'
+import { User2, Scale, Ruler, Target, LayoutTemplate, Play } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,6 +22,7 @@ const profileSchema = z.object({
   goalWeightKg: z.coerce.number().min(30).max(300).optional().or(z.literal('')),
   goalType: z.enum(['strength', 'hypertrophy', 'fat-loss', 'toning']),
   activityLevel: z.enum(['sedentary', 'light', 'moderate', 'active', 'very-active']),
+  workoutTimeLimitMin: z.coerce.number().min(10).max(180).optional().or(z.literal('')),
   chestCm: z.coerce.number().min(0).optional().or(z.literal('')),
   waistCm: z.coerce.number().min(0).optional().or(z.literal('')),
   hipsCm: z.coerce.number().min(0).optional().or(z.literal('')),
@@ -74,7 +76,10 @@ function BodySilhouette({ scale }: { scale: number }) {
 }
 
 export function ProfilePage() {
-  const { profile, saveProfileData } = useWorkout()
+  const navigate = useNavigate()
+  const { profile, saveProfileData, templates, resumeActiveTemplate, setActiveTemplate } = useWorkout()
+
+  const activeTemplate = templates.find((t) => t.id === profile?.activeTemplateId)
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
@@ -86,6 +91,7 @@ export function ProfilePage() {
       goalWeightKg: profile?.goalWeightKg ?? '',
       goalType: profile?.goalType ?? 'hypertrophy',
       activityLevel: profile?.activityLevel ?? 'moderate',
+      workoutTimeLimitMin: profile?.workoutTimeLimitMin ?? '',
       chestCm: profile?.chestCm ?? '',
       waistCm: profile?.waistCm ?? '',
       hipsCm: profile?.hipsCm ?? '',
@@ -104,6 +110,7 @@ export function ProfilePage() {
       setValue('goalWeightKg', profile.goalWeightKg ?? '')
       setValue('goalType', profile.goalType)
       setValue('activityLevel', profile.activityLevel)
+      setValue('workoutTimeLimitMin', profile.workoutTimeLimitMin ?? '')
       setValue('chestCm', profile.chestCm ?? '')
       setValue('waistCm', profile.waistCm ?? '')
       setValue('hipsCm', profile.hipsCm ?? '')
@@ -133,12 +140,15 @@ export function ProfilePage() {
       goalWeightKg: data.goalWeightKg ? Number(data.goalWeightKg) : undefined,
       goalType: data.goalType,
       activityLevel: data.activityLevel,
+      workoutTimeLimitMin: data.workoutTimeLimitMin ? Number(data.workoutTimeLimitMin) : undefined,
       chestCm: data.chestCm ? Number(data.chestCm) : undefined,
       waistCm: data.waistCm ? Number(data.waistCm) : undefined,
       hipsCm: data.hipsCm ? Number(data.hipsCm) : undefined,
       armCm: data.armCm ? Number(data.armCm) : undefined,
       thighCm: data.thighCm ? Number(data.thighCm) : undefined,
       weightLog: profile?.weightLog ?? [],
+      activeTemplateId: profile?.activeTemplateId,
+      activeTemplateExerciseIndex: profile?.activeTemplateExerciseIndex,
     }
     await saveProfileData(p)
   }
@@ -210,7 +220,7 @@ export function ProfilePage() {
 
         {/* Goals */}
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4" /> Goals</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4" /> Goals & Session</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div>
               <Label>Goal Type</Label>
@@ -230,12 +240,24 @@ export function ProfilePage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sedentary">Sedentary (desk job, no exercise)</SelectItem>
-                  <SelectItem value="light">Light (1–3 days/week)</SelectItem>
-                  <SelectItem value="moderate">Moderate (3–5 days/week)</SelectItem>
-                  <SelectItem value="active">Active (6–7 days/week)</SelectItem>
+                  <SelectItem value="light">Light (1-3 days/week)</SelectItem>
+                  <SelectItem value="moderate">Moderate (3-5 days/week)</SelectItem>
+                  <SelectItem value="active">Active (6-7 days/week)</SelectItem>
                   <SelectItem value="very-active">Very Active (athlete / physical job)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label>Workout Time Limit (minutes)</Label>
+              <Input
+                type="number"
+                min={10}
+                max={180}
+                placeholder="e.g. 45 — leave blank for no limit"
+                {...register('workoutTimeLimitMin')}
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">You'll get reminders at 5 min and 2 min remaining.</p>
             </div>
           </CardContent>
         </Card>
@@ -255,6 +277,43 @@ export function ProfilePage() {
 
         <Button type="submit" className="w-full">Save Profile</Button>
       </form>
+
+      {/* Active plan (outside form to avoid submit side-effects) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <LayoutTemplate className="h-4 w-4" /> Active Workout Plan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {activeTemplate ? (
+            <>
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-sm">{activeTemplate.name}</p>
+                <Badge variant="secondary" className="text-xs">Active</Badge>
+              </div>
+              {profile?.activeTemplateExerciseIndex !== undefined && (
+                <p className="text-xs text-muted-foreground">
+                  Next exercise: #{(profile.activeTemplateExerciseIndex) + 1} of {activeTemplate.exercises.length}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={() => { resumeActiveTemplate(); navigate('/log') }}>
+                  <Play className="h-4 w-4 mr-2" /> Resume Plan
+                </Button>
+                <Button variant="outline" onClick={() => setActiveTemplate(null)}>Clear</Button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-2">
+              <p className="text-sm text-muted-foreground mb-3">No active plan. Assign one in Templates.</p>
+              <Button variant="outline" size="sm" onClick={() => navigate('/templates')}>
+                <LayoutTemplate className="h-4 w-4 mr-2" /> Go to Templates
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -1,15 +1,16 @@
 // src/components/WorkoutForm.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Pencil, Trash2, CheckCircle2 } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import type { WorkoutSet } from '@/lib/types'
+import type { SmartRecommendation } from '@/lib/exercises'
 
 const setSchema = z.object({
   weight: z.coerce.number().positive('Weight must be positive'),
@@ -24,10 +25,9 @@ interface WorkoutFormProps {
   onAddSet: (set: WorkoutSet) => void
   onUpdateSet: (id: string, partial: Partial<WorkoutSet>) => void
   onRemoveSet: (id: string) => void
-  onSetAdded: () => void // callback to auto-start rest timer
-  recommendedWeight?: number | null
-  recommendedSets?: number
-  recommendedReps?: number
+  onSetAdded: () => void
+  smartRec?: SmartRecommendation | null
+  currentSetIndex?: number
 }
 
 export function WorkoutForm({
@@ -37,10 +37,15 @@ export function WorkoutForm({
   onUpdateSet,
   onRemoveSet,
   onSetAdded,
-  recommendedWeight,
-  recommendedSets,
-  recommendedReps,
+  smartRec,
+  currentSetIndex = 0,
 }: WorkoutFormProps) {
+  // Per-set hint: what did they do at this set index last time?
+  const lastSetAtIndex = smartRec?.lastSets[currentSetIndex]
+  // Default form values: use this set's last weight if available, else smartRec weight
+  const defaultWeight = lastSetAtIndex?.weight ?? smartRec?.weight
+  const defaultReps = lastSetAtIndex?.reps ?? smartRec?.reps
+
   const {
     register,
     handleSubmit,
@@ -50,10 +55,18 @@ export function WorkoutForm({
   } = useForm<SetForm>({
     resolver: zodResolver(setSchema),
     defaultValues: {
-      weight: recommendedWeight ?? undefined,
-      reps: recommendedReps ?? undefined,
+      weight: defaultWeight ?? undefined,
+      reps: defaultReps ?? undefined,
     },
   })
+
+  // Update defaults when set index changes (next set)
+  useEffect(() => {
+    const w = (smartRec?.lastSets[currentSetIndex]?.weight ?? smartRec?.weight)
+    const r = (smartRec?.lastSets[currentSetIndex]?.reps ?? smartRec?.reps)
+    if (w) setValue('weight', w)
+    if (r) setValue('reps', r)
+  }, [currentSetIndex, smartRec, setValue])
 
   function onSubmit(data: SetForm) {
     const newSet: WorkoutSet = {
@@ -65,30 +78,45 @@ export function WorkoutForm({
       completed: true,
     }
     onAddSet(newSet)
-    reset({ weight: data.weight, reps: data.reps, notes: '' })
+    // Pre-fill next set with last session's data for that index
+    const nextIdx = currentSetIndex + 1
+    const nextLast = smartRec?.lastSets[nextIdx]
+    reset({
+      weight: nextLast?.weight ?? data.weight,
+      reps: nextLast?.reps ?? data.reps,
+      notes: '',
+    })
     onSetAdded()
   }
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Recommendation hint */}
-      {(recommendedWeight || recommendedSets || recommendedReps) && (
-        <div className="rounded-lg bg-primary/10 px-4 py-3 text-sm">
-          <p className="font-medium text-primary">Recommendation</p>
-          <p className="text-muted-foreground">
-            {recommendedSets}×{recommendedReps} @ {recommendedWeight}{weightUnit}
-          </p>
+      {/* Smart recommendation banner */}
+      {smartRec && (
+        <div className={`rounded-lg px-4 py-3 text-sm ${smartRec.isProgression ? 'bg-green-500/10 border border-green-500/30' : 'bg-primary/10'}`}>
+          <div className="flex items-center gap-1.5 mb-1">
+            <TrendingUp className={`h-3.5 w-3.5 ${smartRec.isProgression ? 'text-green-500' : 'text-primary'}`} />
+            <p className={`font-medium text-xs ${smartRec.isProgression ? 'text-green-600 dark:text-green-400' : 'text-primary'}`}>
+              {smartRec.isProgression ? 'Ready to Progress!' : 'Recommendation'}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">{smartRec.note}</p>
+          {lastSetAtIndex && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Set {currentSetIndex + 1} last time: {lastSetAtIndex.weight}{weightUnit} x {lastSetAtIndex.reps} reps
+            </p>
+          )}
           <Button
             type="button"
             size="sm"
             variant="ghost"
             className="mt-1 h-auto p-0 text-xs text-primary"
             onClick={() => {
-              if (recommendedWeight) setValue('weight', recommendedWeight)
-              if (recommendedReps) setValue('reps', recommendedReps)
+              if (defaultWeight) setValue('weight', defaultWeight)
+              if (defaultReps) setValue('reps', defaultReps)
             }}
           >
-            Apply
+            Apply suggestion
           </Button>
         </div>
       )}
@@ -129,7 +157,7 @@ export function WorkoutForm({
           <Label htmlFor="notes">Notes (optional)</Label>
           <Textarea
             id="notes"
-            placeholder="Felt strong, good form…"
+            placeholder="Felt strong, good form..."
             rows={2}
             {...register('notes')}
             className="mt-1"

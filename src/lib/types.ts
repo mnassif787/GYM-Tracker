@@ -78,6 +78,9 @@ export interface UserProfile {
   armCm?: number
   thighCm?: number
   weightLog: WeightEntry[]
+  workoutTimeLimitMin?: number
+  activeTemplateId?: string
+  activeTemplateExerciseIndex?: number
 }
 
 // ─── Templates ────────────────────────────────────────────────────────────────

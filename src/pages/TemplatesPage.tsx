@@ -1,7 +1,7 @@
 // src/pages/TemplatesPage.tsx
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Play, Trash2, ChevronDown, ChevronUp, Pencil, Sparkles } from 'lucide-react'
+import { Plus, Play, Trash2, ChevronDown, ChevronUp, Pencil, Sparkles, BookmarkCheck } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -29,7 +29,7 @@ type TemplateForm = z.infer<typeof templateSchema>
 
 export function TemplatesPage() {
   const navigate = useNavigate()
-  const { templates, exercises, profile, saveTemplateData, deleteTemplateData, startTemplate } = useWorkout()
+  const { templates, exercises, profile, saveTemplateData, deleteTemplateData, startTemplate, setActiveTemplate, resumeActiveTemplate } = useWorkout()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<WorkoutTemplate | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -141,13 +141,24 @@ export function TemplatesPage() {
         </Card>
       )}
 
-      {templates.map((t) => (
-        <Card key={t.id}>
+      {templates.map((t) => {
+        const isActive = profile?.activeTemplateId === t.id
+        const nextIdx = isActive ? (profile?.activeTemplateExerciseIndex ?? 0) % t.exercises.length : null
+        return (
+        <Card key={t.id} className={isActive ? 'ring-2 ring-primary' : ''}>
           <CardHeader className="pb-2">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <CardTitle className="text-base">{t.name}</CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-base">{t.name}</CardTitle>
+                  {isActive && <Badge className="text-xs bg-primary text-primary-foreground">Active Plan</Badge>}
+                </div>
                 {t.description && <p className="text-sm text-muted-foreground mt-0.5">{t.description}</p>}
+                {isActive && nextIdx !== null && (
+                  <p className="text-xs text-primary mt-0.5">
+                    Resume from exercise {nextIdx + 1}/{t.exercises.length}
+                  </p>
+                )}
               </div>
               <div className="flex gap-1 shrink-0">
                 <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
@@ -165,7 +176,7 @@ export function TemplatesPage() {
                 const ex = exercises.find((e) => e.id === te.exerciseId)
                 return (
                   <Badge key={i} variant="secondary" className="text-xs">
-                    {ex?.name ?? te.exerciseId} · {te.sets}×{te.reps}
+                    {ex?.name ?? te.exerciseId} · {te.sets}x{te.reps}
                   </Badge>
                 )
               })}
@@ -178,12 +189,30 @@ export function TemplatesPage() {
                 </button>
               )}
             </div>
-            <Button className="w-full" onClick={() => handleStart(t)}>
-              <Play className="h-4 w-4 mr-2" /> Start Workout
-            </Button>
+            <div className="flex gap-2">
+              {isActive ? (
+                <Button className="flex-1" onClick={() => { resumeActiveTemplate(); navigate('/log') }}>
+                  <Play className="h-4 w-4 mr-2" /> Resume Plan
+                </Button>
+              ) : (
+                <Button className="flex-1" onClick={() => handleStart(t)}>
+                  <Play className="h-4 w-4 mr-2" /> Start Workout
+                </Button>
+              )}
+              {isActive ? (
+                <Button variant="outline" size="sm" onClick={() => setActiveTemplate(null)}>
+                  Clear
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setActiveTemplate(t.id)}>
+                  <BookmarkCheck className="h-4 w-4 mr-1" /> Set as Plan
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
-      ))}
+        )
+      })}
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
