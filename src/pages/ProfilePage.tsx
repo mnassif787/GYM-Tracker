@@ -77,7 +77,7 @@ function BodySilhouette({ scale }: { scale: number }) {
 
 export function ProfilePage() {
   const navigate = useNavigate()
-  const { profile, saveProfileData, templates, resumeActiveTemplate, setActiveTemplate } = useWorkout()
+  const { profile, saveProfileData, templates, exercises, resumeActiveTemplate, setActiveTemplate, startTemplate } = useWorkout()
 
   const activeTemplate = templates.find((t) => t.id === profile?.activeTemplateId)
 
@@ -158,6 +158,64 @@ export function ProfilePage() {
       <h1 className="text-2xl font-bold flex items-center gap-2">
         <User2 className="h-6 w-6" /> Body Profile
       </h1>
+
+      {/* ── Today's Workout ───────────────────────────────────────────── */}
+      {(() => {
+        const todayIdx = new Date().getDay()
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        const todayTemplateId = profile?.weekSchedule?.[todayIdx]
+        const todayTemplate = templates.find((t) => t.id === todayTemplateId)
+        const isActive = profile?.activeTemplateId === todayTemplateId
+        return (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-primary uppercase tracking-wide">
+                Today — {dayNames[todayIdx]}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {todayTemplate ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold">{todayTemplate.name}</p>
+                    {isActive && <Badge variant="secondary" className="text-xs">Active Plan</Badge>}
+                  </div>
+                  {todayTemplate.description && (
+                    <p className="text-xs text-muted-foreground">{todayTemplate.description}</p>
+                  )}
+                  <div className="flex flex-wrap gap-1">
+                    {Array.from(new Set(
+                      todayTemplate.exercises.flatMap((te) =>
+                        exercises.find((e) => e.id === te.exerciseId)?.targetMuscles ?? []
+                      )
+                    )).slice(0, 6).map((m) => (
+                      <Badge key={m} variant="outline" className="text-xs">{m}</Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    {isActive ? (
+                      <Button className="flex-1" onClick={() => { resumeActiveTemplate(); navigate('/log') }}>
+                        <Play className="h-4 w-4 mr-2" /> Resume Plan
+                      </Button>
+                    ) : (
+                      <Button className="flex-1" onClick={() => { startTemplate(todayTemplate); navigate('/log') }}>
+                        <Play className="h-4 w-4 mr-2" /> Start Today's Workout
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">Rest Day — no workout scheduled.</p>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/templates')}>
+                    Edit Schedule
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Live stats card */}
       <Card>

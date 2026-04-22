@@ -50,6 +50,8 @@ interface WorkoutContextValue {
   setActiveTemplate: (templateId: string | null) => Promise<void>
   pendingTemplateExercise: Exercise | null
   clearPendingTemplate: () => void
+  runningTemplateId: string | null
+  saveWeekSchedule: (schedule: Partial<Record<number, string>>) => Promise<void>
 }
 
 const WorkoutContext = createContext<WorkoutContextValue | null>(null)
@@ -267,6 +269,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     toast.success('Profile saved.')
   }, [])
 
+  const saveWeekSchedule = useCallback(async (schedule: Partial<Record<number, string>>) => {
+    const base = await getProfile()
+    if (!base) return
+    const updated: UserProfile = { ...base, weekSchedule: schedule }
+    await dbSaveProfile(updated)
+    setProfile(updated)
+    toast.success('Weekly schedule saved.')
+  }, [])
+
   const saveTemplateData = useCallback(async (template: WorkoutTemplate) => {
     await dbSaveTemplate(template)
     setTemplates((prev) => {
@@ -346,6 +357,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       templates, saveTemplateData, deleteTemplateData, startTemplate,
       resumeActiveTemplate, setActiveTemplate,
       pendingTemplateExercise, clearPendingTemplate,
+      runningTemplateId, saveWeekSchedule,
     }}>
       {children}
     </WorkoutContext.Provider>

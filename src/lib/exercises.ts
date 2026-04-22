@@ -439,3 +439,41 @@ export function getSmartRecommendation(
     isProgression: hitAllReps,
   }
 }
+
+// ─── Exercise ordering helpers ────────────────────────────────────────────────
+
+// Canonical muscle group order: compound/large groups first, isolation last
+export const MUSCLE_GROUP_ORDER: string[] = [
+  'Quadriceps', 'Hamstrings', 'Glutes', 'Back', 'Chest',
+  'Shoulders', 'Triceps', 'Biceps', 'Core', 'Calves', 'Forearms',
+]
+
+/**
+ * Lower score = should go earlier in workout.
+ * Compound movements (more target muscles) + large muscle groups rank first.
+ */
+export function getExercisePriority(exercise: Exercise): number {
+  const primaryMuscle = exercise.targetMuscles[0] ?? ''
+  const groupRank = MUSCLE_GROUP_ORDER.indexOf(primaryMuscle)
+  const groupScore = groupRank === -1 ? MUSCLE_GROUP_ORDER.length : groupRank
+  // More target muscles = more compound = lower score (compound first)
+  const compoundBonus = (4 - Math.min(exercise.targetMuscles.length, 4)) * 10
+  return groupScore + compoundBonus
+}
+
+/**
+ * Returns exerciseIds sorted in optimal workout order:
+ * compound multi-joint first, isolation last.
+ * Preserves original index as tiebreaker so stable.
+ */
+export function sortExercisesByOptimalOrder(
+  exerciseIds: string[],
+  allExercises: Exercise[],
+): string[] {
+  return [...exerciseIds].sort((a, b) => {
+    const exA = allExercises.find((e) => e.id === a)
+    const exB = allExercises.find((e) => e.id === b)
+    if (!exA || !exB) return 0
+    return getExercisePriority(exA) - getExercisePriority(exB)
+  })
+}

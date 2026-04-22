@@ -1,7 +1,7 @@
 // src/pages/TemplatesPage.tsx
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Play, Trash2, ChevronDown, ChevronUp, Pencil, Sparkles, BookmarkCheck } from 'lucide-react'
+import { Plus, Play, Trash2, ChevronDown, ChevronUp, Pencil, Sparkles, BookmarkCheck, ArrowUp, ArrowDown, Wand2, Calendar } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -17,6 +17,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useWorkout } from '@/context/WorkoutContext'
 import type { WorkoutTemplate } from '@/lib/types'
 import { getSuggestionsForGoal, type SuggestedTemplate } from '@/lib/suggestedTemplates'
+import { sortExercisesByOptimalOrder } from '@/lib/exercises'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DISPLAY_DAYS = [1, 2, 3, 4, 5, 6, 0]
+
+function autoAssignSchedule(
+  goalType: string,
+  tmplList: WorkoutTemplate[],
+): Partial<Record<number, string>> {
+  if (tmplList.length === 0) return {}
+  const trainingDays: Record<string, number[]> = {
+    strength:    [1, 3, 5, 6],
+    hypertrophy: [1, 2, 3, 4, 5, 6],
+    'fat-loss':  [1, 3, 5],
+    toning:      [1, 3, 5],
+  }
+  const days = trainingDays[goalType] ?? [1, 3, 5]
+  const schedule: Partial<Record<number, string>> = {}
+  days.forEach((day, i) => { schedule[day] = tmplList[i % tmplList.length].id })
+  return schedule
+}
 
 const templateSchema = z.object({
   name: z.string().min(1, 'Name required'),
@@ -29,10 +51,19 @@ type TemplateForm = z.infer<typeof templateSchema>
 
 export function TemplatesPage() {
   const navigate = useNavigate()
-  const { templates, exercises, profile, saveTemplateData, deleteTemplateData, startTemplate, setActiveTemplate, resumeActiveTemplate } = useWorkout()
+  const {
+    templates, exercises, profile,
+    saveTemplateData, deleteTemplateData, startTemplate,
+    setActiveTemplate, resumeActiveTemplate, saveWeekSchedule,
+  } = useWorkout()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<WorkoutTemplate | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const todayIdx = new Date().getDay()
+  const [weekSchedule, setWeekSchedule] = useState<Partial<Record<number, string>>>(
+    () => profile?.weekSchedule ?? {}
+  )
 
   const suggestions = useMemo(() => {
     if (!profile?.goalType) return []
@@ -52,11 +83,11 @@ export function TemplatesPage() {
     navigate('/log')
   }
 
-  const { register, handleSubmit, control, reset, setValue, formState: { errors } } = useForm<TemplateForm>({
+  const { register, handleSubmit, control, reset, setValue, getValues, formState: { errors } } = useForm<TemplateForm>({
     resolver: zodResolver(templateSchema),
     defaultValues: { name: '', description: '', exercises: [{ exerciseId: '', sets: 3, reps: 10 }] },
   })
-  const { fields, append, remove } = useFieldArray({ control, name: 'exercises' })
+  const { fields, append, remove, move, replace } = useFieldArray({ control, name: 'exercises' })
 
   function openCreate() {
     setEditing(null)
@@ -82,6 +113,31 @@ export function TemplatesPage() {
     setDialogOpen(false)
   }
 
+  function handleOptimizeOrder() {
+    const current = getValues('exercises')
+    const ids = current.map((e) => e.exerciseId).filter(Boolean)
+    const sorted = sortExercisesByOptimalOrder(ids, exercises)
+    const reordered = sorted.map((id) => current.find((e) => e.exerciseId === id)!)
+    replace(reordered)
+  }
+
+  function handleDayChange(dayIdx: number, templateId: string) {
+    setWeekSchedule((prev) => {
+      const next = { ...prev }
+      if (templateId === '__rest__') { delete next[dayIdx] } else { next[dayIdx] = templateId }
+      return next
+    })
+  }
+
+  async function handleSaveSchedule() {
+    await saveWeekSchedule(weekSchedule)
+  }
+
+  function handleAutoAssign() {
+    if (!profile?.goalType) return
+    setWeekSchedule(autoAssignSchedule(profile.goalType, templates))
+  }
+
   async function handleDelete(id: string) {
     await deleteTemplateData(id)
   }
@@ -99,6 +155,56 @@ export function TemplatesPage() {
           <Plus className="h-4 w-4 mr-1" /> New
         </Button>
       </div>
+
+      {/* ── Weekly Schedule ───────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Calendar className="h-4 w-4" /> Weekly Schedule
+            </CardTitle>
+            <div className="flex gap-2">
+              {templates.length > 0 && profile?.goalType && (
+                <Button size="sm" variant="outline" onClick={handleAutoAssign}>
+                  <Wand2 className="h-3.5 w-3.5 mr-1" /> Auto-assign
+                </Button>
+              )}
+              <Button size="sm" onClick={handleSaveSchedule}>Save</Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {templates.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Create templates first to assign them to days.</p>
+          ) : (
+            DISPLAY_DAYS.map((dayIdx) => {
+              const isToday = dayIdx === todayIdx
+              const assigned = weekSchedule[dayIdx]
+              return (
+                <div
+                  key={dayIdx}
+                  className={`flex items-center gap-3 rounded-md px-2 py-1.5 ${isToday ? 'ring-1 ring-primary bg-primary/5' : ''}`}
+                >
+                  <span className={`w-8 text-sm font-medium shrink-0 ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {DAY_NAMES[dayIdx]}{isToday && <span className="text-xs"> *</span>}
+                  </span>
+                  <Select value={assigned ?? '__rest__'} onValueChange={(v) => handleDayChange(dayIdx, v)}>
+                    <SelectTrigger className="h-8 text-sm flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__rest__">Rest Day</SelectItem>
+                      {templates.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )
+            })
+          )}
+        </CardContent>
+      </Card>
 
       {suggestions.length > 0 && (
         <div className="space-y-3">
@@ -232,9 +338,42 @@ export function TemplatesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Exercises</Label>
+              <div className="flex items-center justify-between">
+                <Label>Exercises</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOptimizeOrder}
+                  title="Sort exercises in optimal training order (compound first)"
+                >
+                  <Wand2 className="h-3.5 w-3.5 mr-1" /> Optimize Order
+                </Button>
+              </div>
               {fields.map((field, idx) => (
                 <div key={field.id} className="flex gap-2 items-end">
+                  <div className="flex flex-col gap-0.5 shrink-0 pb-0.5">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-5 w-6"
+                      disabled={idx === 0}
+                      onClick={() => move(idx, idx - 1)}
+                    >
+                      <ArrowUp className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-5 w-6"
+                      disabled={idx === fields.length - 1}
+                      onClick={() => move(idx, idx + 1)}
+                    >
+                      <ArrowDown className="h-3 w-3" />
+                    </Button>
+                  </div>
                   <div className="flex-1">
                     <Select
                       defaultValue={field.exerciseId}

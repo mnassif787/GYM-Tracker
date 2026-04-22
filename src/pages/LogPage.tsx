@@ -1,11 +1,14 @@
 // src/pages/LogPage.tsx
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QrCode, CheckCircle2, Play, Clock, AlertTriangle } from 'lucide-react'
+import { QrCode, CheckCircle2, Play, Clock, AlertTriangle, Shuffle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 import { WorkoutForm } from '@/components/WorkoutForm'
 import { RestTimer } from '@/components/RestTimer'
 import { useWorkout } from '@/context/WorkoutContext'
@@ -83,13 +86,17 @@ export function LogPage() {
     getSmartRec,
     profile,
     sessionStartTime,
-    // templateQueue removed,
+    runningTemplateId,
+    templates,
+    exercises,
+    startTemplate,
   } = useWorkout()
 
-  // Expose templateQueue length via context isn't needed — we just show what we have
   const [showRestTimer, setShowRestTimer] = useState(false)
+  const [showSwitchDialog, setShowSwitchDialog] = useState(false)
 
   const smartRec = currentExercise ? getSmartRec(currentExercise.id) : null
+  const runningTemplate = templates.find((t) => t.id === runningTemplateId)
 
   // Show "next exercise" prompt when template queue advances
   if (!currentExercise && pendingTemplateExercise) {
@@ -114,10 +121,53 @@ export function LogPage() {
           <Button className="w-full" onClick={() => startWorkout(pendingTemplateExercise)}>
             <Play className="h-4 w-4 mr-2" /> Start Exercise
           </Button>
-          <Button variant="outline" className="w-full" onClick={() => { clearPendingTemplate(); navigate('/history') }}>
+          {runningTemplate && (
+            <Button variant="outline" className="w-full" onClick={() => setShowSwitchDialog(true)}>
+              <Shuffle className="h-4 w-4 mr-2" /> Switch Exercise (machine busy)
+            </Button>
+          )}
+          <Button variant="ghost" className="w-full" onClick={() => { clearPendingTemplate(); navigate('/history') }}>
             End Template Session
           </Button>
         </div>
+
+        {runningTemplate && (
+          <Dialog open={showSwitchDialog} onOpenChange={setShowSwitchDialog}>
+            <DialogContent className="max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Pick an Exercise</DialogTitle>
+              </DialogHeader>
+              <p className="text-xs text-muted-foreground mb-3">Jump to any exercise in this template. You can do them in any order.</p>
+              <div className="space-y-2">
+                {runningTemplate.exercises.map((te, idx) => {
+                  const ex = exercises.find((e) => e.id === te.exerciseId)
+                  if (!ex) return null
+                  const isCurrent = ex.id === pendingTemplateExercise.id
+                  return (
+                    <button
+                      key={te.exerciseId}
+                      className={`w-full text-left rounded-lg border px-4 py-3 transition-colors hover:bg-accent ${
+                        isCurrent ? 'border-primary bg-primary/5' : ''
+                      }`}
+                      onClick={() => {
+                        setShowSwitchDialog(false)
+                        startTemplate(runningTemplate, idx)
+                        startWorkout(ex)
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-sm">{ex.name}</p>
+                        {isCurrent && <Badge className="text-xs">Current</Badge>}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">{ex.targetMuscles.join(', ')}</p>
+                      <p className="text-xs text-muted-foreground">{te.sets} sets x {te.reps} reps</p>
+                    </button>
+                  )
+                })}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     )
   }

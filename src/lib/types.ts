@@ -81,6 +81,7 @@ export interface UserProfile {
   workoutTimeLimitMin?: number
   activeTemplateId?: string
   activeTemplateExerciseIndex?: number
+  weekSchedule?: Partial<Record<number, string>>
 }
 
 // ─── Templates ────────────────────────────────────────────────────────────────
