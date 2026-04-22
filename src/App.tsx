@@ -1,6 +1,7 @@
 // src/App.tsx
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Navbar } from '@/components/Navbar'
+import { HomePage } from '@/pages/HomePage'
 import { ScanPage } from '@/pages/ScanPage'
 import { LogPage } from '@/pages/LogPage'
 import { ProgressPage } from '@/pages/ProgressPage'
@@ -24,7 +25,7 @@ export default function App() {
     <div className="min-h-screen bg-background text-foreground">
       <main className="pb-20">
         <Routes>
-          <Route path="/" element={<Navigate to="/scan" replace />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/scan" element={<ScanPage />} />
           <Route path="/log" element={<LogPage />} />
           <Route path="/progress" element={<ProgressPage />} />

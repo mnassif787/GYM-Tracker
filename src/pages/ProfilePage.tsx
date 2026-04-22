@@ -15,6 +15,7 @@ import { useWorkout } from '@/context/WorkoutContext'
 import type { UserProfile } from '@/lib/types'
 
 const profileSchema = z.object({
+  name: z.string().optional(),
   age: z.coerce.number().min(10).max(120),
   gender: z.enum(['male', 'female', 'other']),
   heightCm: z.coerce.number().min(100).max(250),
@@ -84,6 +85,7 @@ export function ProfilePage() {
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
+      name: profile?.name ?? '',
       age: profile?.age ?? 25,
       gender: profile?.gender ?? 'male',
       heightCm: profile?.heightCm ?? 175,
@@ -103,6 +105,7 @@ export function ProfilePage() {
   // Populate when profile loads from DB
   useEffect(() => {
     if (profile) {
+      setValue('name', profile.name ?? '')
       setValue('age', profile.age)
       setValue('gender', profile.gender)
       setValue('heightCm', profile.heightCm)
@@ -133,6 +136,7 @@ export function ProfilePage() {
   async function onSubmit(data: ProfileForm) {
     const p: UserProfile = {
       id: 'user-profile',
+      name: data.name || undefined,
       age: Number(data.age),
       gender: data.gender,
       heightCm: Number(data.heightCm),
@@ -243,6 +247,10 @@ export function ProfilePage() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-base">Basic Info</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Label>Your Name</Label>
+              <Input placeholder="e.g. Alex" {...register('name')} />
+            </div>
             <div>
               <Label>Age</Label>
               <Input type="number" {...register('age')} />

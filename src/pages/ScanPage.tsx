@@ -230,8 +230,16 @@ export function ScanPage() {
             </div>
           )}
           {isAdminMode && (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-2 text-center text-xs text-primary">
-              Admin mode active
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-2 flex items-center justify-between gap-3">
+              <span className="text-xs text-primary font-medium">Admin mode active</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                onClick={() => setAdminMode(false)}
+              >
+                Logout
+              </Button>
             </div>
           )}
 

@@ -65,6 +65,7 @@ export interface WeightEntry {
 
 export interface UserProfile {
   id: 'user-profile'
+  name?: string
   age: number
   gender: 'male' | 'female' | 'other'
   heightCm: number
