@@ -87,6 +87,272 @@ export const DEFAULT_EXERCISES: Exercise[] = [
     instructions:
       'Stand with dumbbells at sides. Curl weights toward shoulders keeping elbows fixed. Squeeze at top, lower with control.',
   },
+
+  // ── Back ─────────────────────────────────────────────────────────────────
+  {
+    id: 'barbell-row',
+    name: 'Barbell Row',
+    targetMuscles: ['Back', 'Lats', 'Biceps'],
+    qrCode: 'GYM-008',
+    isEditable: true,
+    recommendedSets: 4,
+    recommendedReps: 8,
+    weightUnit: 'kg',
+    instructions:
+      'Hinge forward at the hips, back flat, knees slightly bent. Pull the barbell to your lower ribcage, leading with elbows. Lower with control.',
+  },
+  {
+    id: 'seated-cable-row',
+    name: 'Seated Cable Row',
+    targetMuscles: ['Back', 'Lats', 'Biceps'],
+    qrCode: 'GYM-009',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Sit upright at cable row machine. Pull handle to abdomen, squeezing shoulder blades together. Slowly extend arms back to start.',
+  },
+  {
+    id: 'pullup',
+    name: 'Pull-Up',
+    targetMuscles: ['Lats', 'Biceps', 'Back'],
+    qrCode: 'GYM-010',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 8,
+    weightUnit: 'kg',
+    instructions:
+      'Hang from a bar with overhand grip, hands shoulder-width apart. Pull your chest to the bar by driving elbows down. Lower fully.',
+  },
+
+  // ── Chest ────────────────────────────────────────────────────────────────
+  {
+    id: 'incline-bench-press',
+    name: 'Incline Bench Press',
+    targetMuscles: ['Chest', 'Shoulders', 'Triceps'],
+    qrCode: 'GYM-011',
+    isEditable: true,
+    recommendedSets: 4,
+    recommendedReps: 10,
+    weightUnit: 'kg',
+    instructions:
+      'Set bench to 30-45 degrees. Lower the barbell to your upper chest, then press up and slightly back. Focus on upper pec stretch at the bottom.',
+  },
+  {
+    id: 'dumbbell-fly',
+    name: 'Dumbbell Fly',
+    targetMuscles: ['Chest', 'Shoulders'],
+    qrCode: 'GYM-012',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Lie flat on a bench with dumbbells above your chest, elbows slightly bent. Lower them out in an arc until you feel a chest stretch, then squeeze back up.',
+  },
+  {
+    id: 'cable-crossover',
+    name: 'Cable Crossover',
+    targetMuscles: ['Chest'],
+    qrCode: 'GYM-013',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 15,
+    weightUnit: 'kg',
+    instructions:
+      'Stand between two cable stacks set high. Pull handles down and together in front of you, crossing slightly. Squeeze chest, slowly return.',
+  },
+
+  // ── Shoulders ────────────────────────────────────────────────────────────
+  {
+    id: 'lateral-raise',
+    name: 'Lateral Raise',
+    targetMuscles: ['Shoulders'],
+    qrCode: 'GYM-014',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 15,
+    weightUnit: 'kg',
+    instructions:
+      'Hold dumbbells at your sides. Raise arms out to the sides until shoulder height, leading with elbows slightly bent. Lower with control.',
+  },
+  {
+    id: 'face-pull',
+    name: 'Face Pull',
+    targetMuscles: ['Shoulders', 'Traps', 'Back'],
+    qrCode: 'GYM-015',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 15,
+    weightUnit: 'kg',
+    instructions:
+      'Set cable at head height with rope attachment. Pull toward your face, flaring elbows out. Externally rotate hands at end of movement.',
+  },
+
+  // ── Arms ─────────────────────────────────────────────────────────────────
+  {
+    id: 'tricep-pushdown',
+    name: 'Tricep Pushdown',
+    targetMuscles: ['Triceps'],
+    qrCode: 'GYM-016',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Stand at cable machine with bar or rope set high. Keeping elbows at your sides, push down until arms are fully extended. Slowly return.',
+  },
+  {
+    id: 'overhead-tricep-extension',
+    name: 'Overhead Tricep Extension',
+    targetMuscles: ['Triceps'],
+    qrCode: 'GYM-017',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Hold a dumbbell with both hands overhead, arms straight. Lower the weight behind your head by bending elbows, then extend back up.',
+  },
+  {
+    id: 'hammer-curl',
+    name: 'Hammer Curl',
+    targetMuscles: ['Biceps', 'Forearms'],
+    qrCode: 'GYM-018',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Hold dumbbells with a neutral (palms-in) grip. Curl weights up without rotating your wrist. Great for brachialis and forearm thickness.',
+  },
+
+  // ── Legs ─────────────────────────────────────────────────────────────────
+  {
+    id: 'romanian-deadlift',
+    name: 'Romanian Deadlift',
+    targetMuscles: ['Hamstrings', 'Glutes', 'Back'],
+    qrCode: 'GYM-019',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 10,
+    weightUnit: 'kg',
+    instructions:
+      'Hold a barbell at hip height. Hinge forward, pushing hips back, keeping bar close to legs and back flat. Lower until hamstring stretch, drive hips forward to stand.',
+  },
+  {
+    id: 'leg-curl',
+    name: 'Lying Leg Curl',
+    targetMuscles: ['Hamstrings'],
+    qrCode: 'GYM-020',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Lie face down on leg curl machine. Curl weight up toward glutes by flexing knees. Squeeze at the top, lower with control.',
+  },
+  {
+    id: 'leg-extension',
+    name: 'Leg Extension',
+    targetMuscles: ['Quadriceps'],
+    qrCode: 'GYM-021',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Sit in leg extension machine. Extend legs until straight, squeezing quads at the top. Lower slowly.',
+  },
+  {
+    id: 'calf-raise',
+    name: 'Standing Calf Raise',
+    targetMuscles: ['Calves'],
+    qrCode: 'GYM-022',
+    isEditable: true,
+    recommendedSets: 4,
+    recommendedReps: 15,
+    weightUnit: 'kg',
+    instructions:
+      'Stand on the edge of a step or calf raise platform. Rise onto your toes as high as possible, pause at the top, then lower fully for a deep stretch.',
+  },
+  {
+    id: 'hip-thrust',
+    name: 'Hip Thrust',
+    targetMuscles: ['Glutes', 'Hamstrings'],
+    qrCode: 'GYM-023',
+    isEditable: true,
+    recommendedSets: 4,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Rest upper back on a bench, barbell across hips. Drive hips up by squeezing glutes until body forms a straight line from knees to shoulders. Lower with control.',
+  },
+  {
+    id: 'walking-lunge',
+    name: 'Walking Lunge',
+    targetMuscles: ['Quadriceps', 'Glutes', 'Hamstrings'],
+    qrCode: 'GYM-024',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Hold dumbbells at your sides. Step forward into a lunge, lower back knee toward floor, then drive through front heel and bring the other foot forward. Alternate legs.',
+  },
+
+  // ── Core ─────────────────────────────────────────────────────────────────
+  {
+    id: 'cable-crunch',
+    name: 'Cable Crunch',
+    targetMuscles: ['Abs', 'Core'],
+    qrCode: 'GYM-025',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 15,
+    weightUnit: 'kg',
+    instructions:
+      'Kneel at a high cable with rope attachment. Hold rope at either side of your head. Crunch down by flexing your spine, not pulling with your arms.',
+  },
+  {
+    id: 'plank',
+    name: 'Plank',
+    targetMuscles: ['Core', 'Abs', 'Shoulders'],
+    qrCode: 'GYM-026',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 1,
+    weightUnit: 'kg',
+    instructions:
+      'Support your body on forearms and toes, body in a straight line. Brace your core, squeeze glutes, do not let hips sag. Hold for time.',
+  },
+  {
+    id: 'hanging-leg-raise',
+    name: 'Hanging Leg Raise',
+    targetMuscles: ['Abs', 'Core', 'Hip Flexors'],
+    qrCode: 'GYM-027',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 12,
+    weightUnit: 'kg',
+    instructions:
+      'Hang from a pull-up bar. Keeping legs straight or knees bent for easier variation, raise them until parallel to the floor. Lower with control, avoid swinging.',
+  },
+
+  // ── Traps ────────────────────────────────────────────────────────────────
+  {
+    id: 'shrug',
+    name: 'Dumbbell Shrug',
+    targetMuscles: ['Traps'],
+    qrCode: 'GYM-028',
+    isEditable: true,
+    recommendedSets: 3,
+    recommendedReps: 15,
+    weightUnit: 'kg',
+    instructions:
+      'Hold heavy dumbbells at your sides. Shrug shoulders straight up toward your ears, hold briefly at the top, then lower fully. No rolling of the shoulders.',
+  },
 ]
 
 export function getExerciseByQrCode(qrCode: string, exercises = DEFAULT_EXERCISES): Exercise | undefined {

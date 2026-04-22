@@ -1,7 +1,7 @@
 // src/pages/TemplatesPage.tsx
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Play, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
+import { Plus, Play, Trash2, ChevronDown, ChevronUp, Pencil, Sparkles } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -16,6 +16,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useWorkout } from '@/context/WorkoutContext'
 import type { WorkoutTemplate } from '@/lib/types'
+import { getSuggestionsForGoal, type SuggestedTemplate } from '@/lib/suggestedTemplates'
 
 const templateSchema = z.object({
   name: z.string().min(1, 'Name required'),
@@ -28,10 +29,28 @@ type TemplateForm = z.infer<typeof templateSchema>
 
 export function TemplatesPage() {
   const navigate = useNavigate()
-  const { templates, exercises, saveTemplateData, deleteTemplateData, startTemplate } = useWorkout()
+  const { templates, exercises, profile, saveTemplateData, deleteTemplateData, startTemplate } = useWorkout()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<WorkoutTemplate | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const suggestions = useMemo(() => {
+    if (!profile?.goalType) return []
+    return getSuggestionsForGoal(profile.goalType, templates.map((t) => t.name))
+  }, [profile?.goalType, templates])
+
+  async function adoptSuggestion(s: SuggestedTemplate) {
+    const template: WorkoutTemplate = {
+      id: crypto.randomUUID(),
+      name: s.name,
+      description: s.description,
+      exercises: s.exercises,
+      createdAt: new Date().toISOString(),
+    }
+    await saveTemplateData(template)
+    startTemplate(template)
+    navigate('/log')
+  }
 
   const { register, handleSubmit, control, reset, setValue, formState: { errors } } = useForm<TemplateForm>({
     resolver: zodResolver(templateSchema),
@@ -80,6 +99,39 @@ export function TemplatesPage() {
           <Plus className="h-4 w-4 mr-1" /> New
         </Button>
       </div>
+
+      {suggestions.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h2 className="font-semibold text-sm">Suggested for You</h2>
+            <span className="text-xs text-muted-foreground capitalize">({profile?.goalType})</span>
+          </div>
+          {suggestions.map((s) => (
+            <Card key={s.name} className="border-dashed">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{s.name}</CardTitle>
+                <p className="text-xs text-muted-foreground">{s.description}</p>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex flex-wrap gap-1">
+                  {s.exercises.map((te, i) => {
+                    const ex = exercises.find((e) => e.id === te.exerciseId)
+                    return (
+                      <Badge key={i} variant="outline" className="text-xs">
+                        {ex?.name ?? te.exerciseId} · {te.sets}×{te.reps}
+                      </Badge>
+                    )
+                  })}
+                </div>
+                <Button className="w-full" variant="secondary" onClick={() => adoptSuggestion(s)}>
+                  <Play className="h-4 w-4 mr-2" /> Start Now
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {templates.length === 0 && (
         <Card>
