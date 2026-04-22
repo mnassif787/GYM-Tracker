@@ -1,12 +1,12 @@
 // src/pages/ScanPage.tsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import QRCode from 'qrcode'
 import {
-  Dumbbell, ChevronRight, RotateCcw, History, Pencil, ShieldCheck, Download, QrCode, Link,
+  Dumbbell, ChevronRight, RotateCcw, History, Pencil, ShieldCheck, Download, QrCode, Link, Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -49,7 +49,7 @@ const BODY_TYPE_PRESETS: Record<BodyTypeGoal, { sets: number; reps: number }> = 
 
 export function ScanPage() {
   const navigate = useNavigate()
-  const { startWorkout, saveExercise, exercises, isAdminMode, setAdminMode } = useWorkout()
+  const { startWorkout, saveExercise, exercises, workoutHistory, isAdminMode, setAdminMode } = useWorkout()
 
   const [scannedExercise, setScannedExercise] = useState<Exercise | null>(null)
 
@@ -57,6 +57,10 @@ export function ScanPage() {
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null)
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [assignExerciseId, setAssignExerciseId] = useState('')
+
+  // Browse dialog state
+  const [browseOpen, setBrowseOpen] = useState(false)
+  const [browseSearch, setBrowseSearch] = useState('')
 
   // Admin dialog state
   const [adminDialogOpen, setAdminDialogOpen] = useState(false)
@@ -166,6 +170,39 @@ export function ScanPage() {
     navigate('/log')
   }
 
+  // ─── Recent + browse derived lists ───────────────────────────────────────
+  const recentExercises = useMemo(() => {
+    const seen = new Set<string>()
+    const result: Exercise[] = []
+    for (const w of workoutHistory) {
+      if (!seen.has(w.exerciseId)) {
+        seen.add(w.exerciseId)
+        const ex = exercises.find((e) => e.id === w.exerciseId)
+        if (ex) result.push(ex)
+      }
+      if (result.length === 4) break
+    }
+    return result
+  }, [workoutHistory, exercises])
+
+  const browseFiltered = useMemo(() => {
+    const q = browseSearch.toLowerCase()
+    return !q
+      ? exercises
+      : exercises.filter(
+          (e) =>
+            e.name.toLowerCase().includes(q) ||
+            e.targetMuscles.some((m) => m.toLowerCase().includes(q)),
+        )
+  }, [exercises, browseSearch])
+
+  function handlePickExercise(exercise: Exercise) {
+    setBrowseOpen(false)
+    setBrowseSearch('')
+    startWorkout(exercise)
+    navigate('/log')
+  }
+
   return (
     <div className="mx-auto max-w-md px-4 py-6 page-transition">
       <div className="mb-6">
@@ -197,6 +234,36 @@ export function ScanPage() {
               Admin mode active
             </div>
           )}
+
+          {/* Recent exercises */}
+          {recentExercises.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Recent
+              </p>
+              <div className="flex flex-col gap-2">
+                {recentExercises.map((ex) => (
+                  <button
+                    key={ex.id}
+                    onClick={() => handlePickExercise(ex)}
+                    className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/30"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{ex.name}</p>
+                      <p className="text-xs text-muted-foreground">{ex.targetMuscles.join(', ')}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Browse all */}
+          <Button variant="outline" className="w-full" onClick={() => setBrowseOpen(true)}>
+            <Search className="mr-2 h-4 w-4" />
+            Browse All Exercises
+          </Button>
         </div>
       ) : (
         /* ── Exercise Result Card ── */
@@ -442,6 +509,47 @@ export function ScanPage() {
             <Button variant="ghost" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
             <Button disabled={!assignExerciseId} onClick={handleAssignBarcode}>Assign</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Browse Exercises Dialog ──────────────────────────────────────── */}
+      <Dialog open={browseOpen} onOpenChange={(o) => { setBrowseOpen(o); if (!o) setBrowseSearch('') }}>
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 p-0">
+          <DialogHeader className="px-4 pb-2 pt-4">
+            <DialogTitle>Browse Exercises</DialogTitle>
+          </DialogHeader>
+          <div className="px-4 pb-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search name or muscle…"
+                value={browseSearch}
+                onChange={(e) => setBrowseSearch(e.target.value)}
+                className="pl-9"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 pb-4">
+            <div className="flex flex-col gap-2">
+              {browseFiltered.map((ex) => (
+                <button
+                  key={ex.id}
+                  onClick={() => handlePickExercise(ex)}
+                  className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/30"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{ex.name}</p>
+                    <p className="text-xs text-muted-foreground">{ex.targetMuscles.join(', ')}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+              {browseFiltered.length === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">No exercises found.</p>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
