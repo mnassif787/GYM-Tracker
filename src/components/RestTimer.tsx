@@ -8,6 +8,28 @@ import { Slider } from '@/components/ui/slider'
 const RADIUS = 52
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
+// Web Audio API beep — no audio files needed, works offline
+function playBeep(frequency = 880, durationSec = 0.25, volume = 0.4) {
+  try {
+    const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new AudioCtx()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.value = frequency
+    gain.gain.setValueAtTime(volume, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationSec)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + durationSec)
+    // Clean up context after beep
+    setTimeout(() => ctx.close(), (durationSec + 0.1) * 1000)
+  } catch {
+    // Audio not supported — silently skip
+  }
+}
+
 interface RestTimerProps {
   defaultSeconds?: number
   onComplete?: () => void
@@ -30,7 +52,11 @@ export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
     stopInterval()
     setIsRunning(false)
     setRemaining(0)
-    if ('vibrate' in navigator) navigator.vibrate(200)
+    if ('vibrate' in navigator) navigator.vibrate([200, 100, 200])
+    // Three ascending beeps on completion
+    playBeep(660, 0.15)
+    setTimeout(() => playBeep(770, 0.15), 180)
+    setTimeout(() => playBeep(880, 0.3), 360)
     toast.success('Rest complete! Time to lift 💪')
     onComplete?.()
   }, [stopInterval, onComplete])
@@ -39,6 +65,10 @@ export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
         setRemaining((prev) => {
+          // Countdown warning beeps at 3, 2, 1
+          if (prev === 4) playBeep(440, 0.1)
+          if (prev === 3) playBeep(440, 0.1)
+          if (prev === 2) playBeep(440, 0.1)
           if (prev <= 1) {
             handleComplete()
             return 0

@@ -55,3 +55,43 @@ export interface ExerciseStats {
     maxWeight: number
   }[]
 }
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+export interface WeightEntry {
+  date: string
+  weight: number
+}
+
+export interface UserProfile {
+  id: 'user-profile'
+  age: number
+  gender: 'male' | 'female' | 'other'
+  heightCm: number
+  weightKg: number
+  goalWeightKg?: number
+  goalType: 'strength' | 'hypertrophy' | 'fat-loss' | 'toning'
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very-active'
+  chestCm?: number
+  waistCm?: number
+  hipsCm?: number
+  armCm?: number
+  thighCm?: number
+  weightLog: WeightEntry[]
+}
+
+// ─── Templates ────────────────────────────────────────────────────────────────
+
+export interface TemplateExercise {
+  exerciseId: string
+  sets: number
+  reps: number
+}
+
+export interface WorkoutTemplate {
+  id: string
+  name: string
+  description?: string
+  exercises: TemplateExercise[]
+  createdAt: string
+}

@@ -1,14 +1,22 @@
 // src/pages/ProgressPage.tsx
-import { useMemo } from 'react'
-import { format } from 'date-fns'
+import { useMemo, useState } from 'react'
+import { format, subDays } from 'date-fns'
 import { Dumbbell, BarChart2, Layers, Calendar } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ProgressChart } from '@/components/ProgressChart'
+import { MuscleHeatmap } from '@/components/MuscleHeatmap'
 import { useWorkout } from '@/context/WorkoutContext'
 
 export function ProgressPage() {
   const { workoutHistory, exercises } = useWorkout()
+  const [heatmapView, setHeatmapView] = useState<'front' | 'back'>('front')
+
+  const last7Days = useMemo(() => {
+    const cutoff = subDays(new Date(), 7).getTime()
+    return workoutHistory.filter((w) => new Date(w.date).getTime() >= cutoff)
+  }, [workoutHistory])
 
   const stats = useMemo(() => {
     const totalSets = workoutHistory.reduce((sum, w) => sum + w.sets.length, 0)
@@ -81,6 +89,23 @@ export function ProgressPage() {
         </CardHeader>
         <CardContent>
           <ProgressChart workouts={workoutHistory} exercises={loggedExercises} />
+        </CardContent>
+      </Card>
+
+      {/* Muscle Heatmap */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Weekly Muscle Coverage</CardTitle>
+            <div className="flex gap-1">
+              <Button size="sm" variant={heatmapView === 'front' ? 'default' : 'outline'} className="h-7 px-2 text-xs" onClick={() => setHeatmapView('front')}>Front</Button>
+              <Button size="sm" variant={heatmapView === 'back' ? 'default' : 'outline'} className="h-7 px-2 text-xs" onClick={() => setHeatmapView('back')}>Back</Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">Last 7 days · {last7Days.length} workouts</p>
+        </CardHeader>
+        <CardContent>
+          <MuscleHeatmap workouts={last7Days} view={heatmapView} />
         </CardContent>
       </Card>
     </div>

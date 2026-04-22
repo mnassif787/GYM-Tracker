@@ -8,6 +8,8 @@ import { HistoryPage } from '@/pages/HistoryPage'
 import { ExerciseHistoryPage } from '@/pages/ExerciseHistoryPage'
 import { ExercisesPage } from '@/pages/ExercisesPage'
 import { MachinePage } from '@/pages/admin/MachinePage'
+import { ProfilePage } from '@/pages/ProfilePage'
+import { TemplatesPage } from '@/pages/TemplatesPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { useWorkout } from '@/context/WorkoutContext'
 
@@ -29,6 +31,8 @@ export default function App() {
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/exercise-history/:id" element={<ExerciseHistoryPage />} />
           <Route path="/exercises" element={<ExercisesPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/templates" element={<TemplatesPage />} />
           <Route
             path="/admin/machines"
             element={

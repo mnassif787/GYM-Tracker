@@ -2,20 +2,16 @@
 // IndexedDB persistence layer via idb — replaces all localStorage for workout/exercise data.
 
 import { openDB, type IDBPDatabase } from 'idb'
-import type { Workout, Exercise } from './types'
+import type { Workout, Exercise, UserProfile, WorkoutTemplate } from './types'
 
 const DB_NAME = 'gym-tracker'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 type GymTrackerDB = {
-  workouts: {
-    key: string
-    value: Workout
-  }
-  exercises: {
-    key: string
-    value: Exercise
-  }
+  workouts: { key: string; value: Workout }
+  exercises: { key: string; value: Exercise }
+  profile: { key: string; value: UserProfile }
+  templates: { key: string; value: WorkoutTemplate }
 }
 
 let dbPromise: Promise<IDBPDatabase<GymTrackerDB>> | null = null
@@ -29,6 +25,14 @@ function getDB(): Promise<IDBPDatabase<GymTrackerDB>> {
         }
         if (oldVersion < 2) {
           db.createObjectStore('exercises', { keyPath: 'id' })
+        }
+        if (oldVersion < 3) {
+          if (!db.objectStoreNames.contains('profile')) {
+            db.createObjectStore('profile', { keyPath: 'id' })
+          }
+          if (!db.objectStoreNames.contains('templates')) {
+            db.createObjectStore('templates', { keyPath: 'id' })
+          }
         }
       },
     })
@@ -68,4 +72,33 @@ export async function saveExercise(exercise: Exercise): Promise<void> {
 export async function deleteExercise(id: string): Promise<void> {
   const db = await getDB()
   await db.delete('exercises', id)
+}
+
+// ─── Profile ─────────────────────────────────────────────────────────────────
+
+export async function getProfile(): Promise<UserProfile | undefined> {
+  const db = await getDB()
+  return db.get('profile', 'user-profile')
+}
+
+export async function saveProfile(profile: UserProfile): Promise<void> {
+  const db = await getDB()
+  await db.put('profile', profile)
+}
+
+// ─── Templates ───────────────────────────────────────────────────────────────
+
+export async function getAllTemplates(): Promise<WorkoutTemplate[]> {
+  const db = await getDB()
+  return db.getAll('templates')
+}
+
+export async function saveTemplate(template: WorkoutTemplate): Promise<void> {
+  const db = await getDB()
+  await db.put('templates', template)
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  const db = await getDB()
+  await db.delete('templates', id)
 }

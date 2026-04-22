@@ -1,7 +1,8 @@
 // src/pages/HistoryPage.tsx
+import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { Download, Trophy, ChevronRight, Trash2, FlaskConical } from 'lucide-react'
+import { Download, Trophy, ChevronRight, Trash2, FlaskConical, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,18 +10,36 @@ import { useWorkout } from '@/context/WorkoutContext'
 
 export function HistoryPage() {
   const navigate = useNavigate()
-  const { workoutHistory, deleteWorkout, loadDemoData } = useWorkout()
+  const { workoutHistory, deleteWorkout, loadDemoData, importWorkouts } = useWorkout()
+  const importRef = useRef<HTMLInputElement>(null)
 
   function handleExportJSON() {
-    const blob = new Blob([JSON.stringify(workoutHistory, null, 2)], {
-      type: 'application/json',
-    })
+    const blob = new Blob([JSON.stringify(workoutHistory, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = `gym-tracker-export-${format(new Date(), 'yyyy-MM-dd')}.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  function handleImportClick() {
+    importRef.current?.click()
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      await importWorkouts(data)
+    } catch {
+      const { toast } = await import('sonner')
+      toast.error('Failed to import — invalid JSON file.')
+    } finally {
+      e.target.value = ''
+    }
   }
 
   return (
@@ -32,13 +51,18 @@ export function HistoryPage() {
             <FlaskConical className="mr-2 h-4 w-4" />
             Load Demo
           </Button>
+          <Button variant="outline" size="sm" onClick={handleImportClick}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           {workoutHistory.length > 0 && (
             <Button variant="outline" size="sm" onClick={handleExportJSON}>
               <Download className="mr-2 h-4 w-4" />
-              Export JSON
+              Export
             </Button>
           )}
         </div>
+        <input ref={importRef} type="file" accept=".json" className="hidden" onChange={handleImportFile} />
       </div>
 
       {workoutHistory.length === 0 ? (

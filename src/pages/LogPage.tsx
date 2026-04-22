@@ -1,7 +1,7 @@
 // src/pages/LogPage.tsx
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QrCode, CheckCircle2 } from 'lucide-react'
+import { QrCode, CheckCircle2, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,9 +20,38 @@ export function LogPage() {
     updateSet,
     removeSet,
     completeWorkout,
+    pendingTemplateExercise,
+    startWorkout,
+    clearPendingTemplate,
   } = useWorkout()
 
   const [showRestTimer, setShowRestTimer] = useState(false)
+
+  // Show "next exercise" prompt when template queue advances
+  if (!currentExercise && pendingTemplateExercise) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-12 text-center page-transition">
+        <div className="mb-4 flex justify-center">
+          <div className="rounded-full bg-primary/10 p-6">
+            <Play className="h-12 w-12 text-primary" />
+          </div>
+        </div>
+        <h2 className="text-xl font-semibold">Up Next</h2>
+        <p className="mt-2 text-lg font-medium">{pendingTemplateExercise.name}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {pendingTemplateExercise.targetMuscles.join(', ')}
+        </p>
+        <div className="mt-6 space-y-2">
+          <Button className="w-full" onClick={() => startWorkout(pendingTemplateExercise)}>
+            <Play className="h-4 w-4 mr-2" /> Start Exercise
+          </Button>
+          <Button variant="outline" className="w-full" onClick={() => { clearPendingTemplate(); navigate('/history') }}>
+            End Template Session
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   if (!currentExercise || !currentWorkout) {
     return (
@@ -47,7 +76,8 @@ export function LogPage() {
 
   async function handleComplete() {
     await completeWorkout()
-    navigate('/history')
+    // If template queue: stay on /log so the "Up Next" screen shows
+    if (!pendingTemplateExercise) navigate('/history')
   }
 
   return (
