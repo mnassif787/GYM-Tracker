@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import QRCode from 'qrcode'
 import {
-  Dumbbell, ChevronRight, RotateCcw, History, Pencil, ShieldCheck, Download, QrCode,
+  Dumbbell, ChevronRight, RotateCcw, History, Pencil, ShieldCheck, Download, QrCode, Link,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -49,9 +49,14 @@ const BODY_TYPE_PRESETS: Record<BodyTypeGoal, { sets: number; reps: number }> = 
 
 export function ScanPage() {
   const navigate = useNavigate()
-  const { startWorkout, saveExercise, isAdminMode, setAdminMode } = useWorkout()
+  const { startWorkout, saveExercise, exercises, isAdminMode, setAdminMode } = useWorkout()
 
   const [scannedExercise, setScannedExercise] = useState<Exercise | null>(null)
+
+  // Assign barcode dialog state (admin only)
+  const [pendingBarcode, setPendingBarcode] = useState<string | null>(null)
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [assignExerciseId, setAssignExerciseId] = useState('')
 
   // Admin dialog state
   const [adminDialogOpen, setAdminDialogOpen] = useState(false)
@@ -135,6 +140,26 @@ export function ScanPage() {
     setScannedExercise(exercise)
   }
 
+  function handleUnknownCode(code: string) {
+    if (isAdminMode) {
+      setPendingBarcode(code)
+      setAssignExerciseId('')
+      setAssignDialogOpen(true)
+    } else {
+      import('sonner').then(({ toast }) =>
+        toast.error(`Code "${code}" not assigned to any exercise.`),
+      )
+    }
+  }
+
+  async function handleAssignBarcode() {
+    const ex = exercises.find((e) => e.id === assignExerciseId)
+    if (!ex || !pendingBarcode) return
+    await saveExercise({ ...ex, qrCode: pendingBarcode })
+    setAssignDialogOpen(false)
+    setPendingBarcode(null)
+  }
+
   function handleStartWorkout() {
     if (!scannedExercise) return
     startWorkout(scannedExercise)
@@ -152,7 +177,7 @@ export function ScanPage() {
 
       {!scannedExercise ? (
         <div className="flex flex-col gap-6">
-          <Scanner onScanSuccess={handleScanSuccess} />
+          <Scanner onScanSuccess={handleScanSuccess} onUnknownCode={handleUnknownCode} />
 
           {/* Admin access (hidden until tapped — ghost button) */}
           {!isAdminMode && (
@@ -383,6 +408,40 @@ export function ScanPage() {
               </a>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Assign Barcode Dialog (admin) ────────────────────────────────── */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link className="h-5 w-5" /> Assign Barcode to Exercise
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Scanned code</p>
+              <p className="rounded bg-muted px-3 py-2 font-mono text-sm break-all">{pendingBarcode}</p>
+            </div>
+            <div>
+              <Label>Exercise</Label>
+              <Select value={assignExerciseId} onValueChange={setAssignExerciseId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Choose exercise…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {exercises.map((ex) => (
+                    <SelectItem key={ex.id} value={ex.id}>{ex.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="mt-2">
+            <Button variant="ghost" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+            <Button disabled={!assignExerciseId} onClick={handleAssignBarcode}>Assign</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

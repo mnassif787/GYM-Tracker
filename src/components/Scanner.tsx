@@ -12,9 +12,10 @@ import { useWorkout } from '@/context/WorkoutContext'
 
 interface ScannerProps {
   onScanSuccess: (exercise: Exercise) => void
+  onUnknownCode?: (code: string) => void
 }
 
-export function Scanner({ onScanSuccess }: ScannerProps) {
+export function Scanner({ onScanSuccess, onUnknownCode }: ScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const readerRef = useRef<BrowserMultiFormatReader | null>(null)
   const [isScanning, setIsScanning] = useState(false)
@@ -66,8 +67,11 @@ export function Scanner({ onScanSuccess }: ScannerProps) {
             if (exercise) {
               stopScanner()
               onScanSuccess(exercise)
+            } else if (onUnknownCode) {
+              stopScanner()
+              onUnknownCode(text)
             } else {
-              setError(`QR code "${text}" not assigned to any exercise.`)
+              setError(`Code "${text}" not assigned to any exercise.`)
             }
           } else if (err && !(err instanceof NotFoundException)) {
             // NotFoundException is normal (no QR code in frame) — ignore it
