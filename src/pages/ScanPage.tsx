@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import QRCode from 'qrcode'
 import {
-  Dumbbell, ChevronRight, RotateCcw, History, Pencil, ShieldCheck, Download, QrCode, Link, Search,
+  Dumbbell, ChevronRight, RotateCcw, History, Pencil, ShieldCheck, Download, QrCode, Link, Search, Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -185,6 +185,11 @@ export function ScanPage() {
     return result
   }, [workoutHistory, exercises])
 
+  const recentExerciseIds = useMemo(
+    () => new Set(recentExercises.map((e) => e.id)),
+    [recentExercises],
+  )
+
   const browseFiltered = useMemo(() => {
     const q = browseSearch.toLowerCase()
     return !q
@@ -206,7 +211,7 @@ export function ScanPage() {
   return (
     <div className="mx-auto max-w-md px-4 py-6 page-transition">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Scan Exercise</h1>
+        <h1 className="text-2xl font-bold">Scan</h1>
         <p className="text-sm text-muted-foreground">
           Point your camera at a gym machine QR code
         </p>
@@ -246,7 +251,7 @@ export function ScanPage() {
           {/* Recent exercises */}
           {recentExercises.length > 0 && (
             <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="mb-2.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Recent
               </p>
               <div className="flex flex-col gap-2">
@@ -254,10 +259,13 @@ export function ScanPage() {
                   <button
                     key={ex.id}
                     onClick={() => handlePickExercise(ex)}
-                    className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/30"
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-left transition-all active:scale-[0.98] hover:border-primary/20 hover:bg-accent/30"
                   >
-                    <div>
-                      <p className="text-sm font-medium">{ex.name}</p>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted">
+                      <Dumbbell className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{ex.name}</p>
                       <p className="text-xs text-muted-foreground">{ex.targetMuscles.join(', ')}</p>
                     </div>
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -275,7 +283,7 @@ export function ScanPage() {
         </div>
       ) : (
         /* ── Exercise Result Card ── */
-        <Card>
+        <Card className="rounded-3xl border-primary/30 bg-primary/5">
           <CardHeader>
             <div className="flex items-start justify-between">
               <div>
@@ -288,7 +296,9 @@ export function ScanPage() {
                   </p>
                 )}
               </div>
-              <Dumbbell className="h-8 w-8 text-primary" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                <Dumbbell className="h-6 w-6 text-primary" />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -544,10 +554,17 @@ export function ScanPage() {
                 <button
                   key={ex.id}
                   onClick={() => handlePickExercise(ex)}
-                  className="flex items-center justify-between rounded-lg border bg-card px-4 py-3 text-left transition-colors hover:bg-accent/30"
+                  className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-left transition-all active:scale-[0.98] hover:border-primary/20 hover:bg-accent/30"
                 >
-                  <div>
-                    <p className="text-sm font-medium">{ex.name}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold truncate">{ex.name}</p>
+                      {recentExerciseIds.has(ex.id) && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary shrink-0">
+                          <Check className="h-2.5 w-2.5" /> Recent
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">{ex.targetMuscles.join(', ')}</p>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

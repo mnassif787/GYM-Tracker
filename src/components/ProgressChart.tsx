@@ -63,17 +63,20 @@ export function ProgressChart({ workouts, exercises }: ProgressChartProps) {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+          <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis
               dataKey="date"
               tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
               tickLine={false}
+              interval="preserveStartEnd"
             />
             <YAxis
               tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
               tickLine={false}
+              width={40}
               unit={weightUnit}
+              domain={['auto', 'auto']}
             />
             <Tooltip
               contentStyle={{
@@ -82,7 +85,11 @@ export function ProgressChart({ workouts, exercises }: ProgressChartProps) {
                 borderRadius: '8px',
                 fontSize: 12,
               }}
-              formatter={(value: number) => [`${value}${weightUnit}`, 'Max Weight']}
+              formatter={(value: number, _name: string, props) => [
+                `${value}${weightUnit}${props.payload?.isPR ? ' 🏆 PR' : ''}`,
+                'Max Weight',
+              ]}
+              labelFormatter={(label) => `Session: ${label}`}
             />
             <Line
               type="monotone"

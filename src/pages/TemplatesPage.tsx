@@ -1,14 +1,17 @@
-// src/pages/TemplatesPage.tsx
+﻿// src/pages/TemplatesPage.tsx
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Play, Trash2, ChevronDown, ChevronUp, Pencil, Sparkles, BookmarkCheck, ArrowUp, ArrowDown, Wand2, Calendar } from 'lucide-react'
+import {
+  Plus, Play, Trash2, ChevronDown, ChevronUp, Pencil, Sparkles,
+  BookmarkCheck, ArrowUp, ArrowDown, Wand2, Clock, Dumbbell,
+} from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -18,9 +21,10 @@ import { useWorkout } from '@/context/WorkoutContext'
 import type { WorkoutTemplate } from '@/lib/types'
 import { getSuggestionsForGoal, type SuggestedTemplate } from '@/lib/suggestedTemplates'
 import { sortExercisesByOptimalOrder } from '@/lib/exercises'
+import { cn } from '@/lib/utils'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DISPLAY_DAYS = [1, 2, 3, 4, 5, 6, 0]
 
 function autoAssignSchedule(
@@ -44,10 +48,18 @@ const templateSchema = z.object({
   name: z.string().min(1, 'Name required'),
   description: z.string().optional(),
   exercises: z.array(
-    z.object({ exerciseId: z.string().min(1, 'Choose exercise'), sets: z.coerce.number().min(1), reps: z.coerce.number().min(1) }),
+    z.object({
+      exerciseId: z.string().min(1, 'Choose exercise'),
+      sets: z.coerce.number().min(1),
+      reps: z.coerce.number().min(1),
+    }),
   ).min(1, 'Add at least one exercise'),
 })
 type TemplateForm = z.infer<typeof templateSchema>
+
+function estimateDuration(exerciseCount: number) {
+  return Math.max(15, Math.round(exerciseCount * 4))
+}
 
 export function TemplatesPage() {
   const navigate = useNavigate()
@@ -56,9 +68,11 @@ export function TemplatesPage() {
     saveTemplateData, deleteTemplateData, startTemplate,
     setActiveTemplate, resumeActiveTemplate, saveWeekSchedule,
   } = useWorkout()
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<WorkoutTemplate | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay())
 
   const todayIdx = new Date().getDay()
   const [weekSchedule, setWeekSchedule] = useState<Partial<Record<number, string>>>(
@@ -148,276 +162,388 @@ export function TemplatesPage() {
   }
 
   return (
-    <div className="p-4 pb-24 space-y-4">
+    <div className="mx-auto max-w-lg px-4 pb-28 pt-6 space-y-6 page-transition">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Templates</h1>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-1" /> New
+        <h1 className="text-2xl font-bold">Plans</h1>
+        <Button size="sm" onClick={openCreate} className="gap-1.5">
+          <Plus className="h-4 w-4" /> New Plan
         </Button>
       </div>
 
-      {/* ── Weekly Schedule ───────────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="h-4 w-4" /> Weekly Schedule
-            </CardTitle>
+      {/* â”€â”€ Weekly Schedule â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {templates.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Weekly Schedule
+            </p>
             <div className="flex gap-2">
-              {templates.length > 0 && profile?.goalType && (
-                <Button size="sm" variant="outline" onClick={handleAutoAssign}>
-                  <Wand2 className="h-3.5 w-3.5 mr-1" /> Auto-assign
+              {profile?.goalType && (
+                <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={handleAutoAssign}>
+                  <Wand2 className="h-3 w-3" /> Auto-fill
                 </Button>
               )}
-              <Button size="sm" onClick={handleSaveSchedule}>Save</Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {templates.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Create templates first to assign them to days.</p>
-          ) : (
-            DISPLAY_DAYS.map((dayIdx) => {
-              const isToday = dayIdx === todayIdx
-              const assigned = weekSchedule[dayIdx]
-              return (
-                <div
-                  key={dayIdx}
-                  className={`flex items-center gap-3 rounded-md px-2 py-1.5 ${isToday ? 'ring-1 ring-primary bg-primary/5' : ''}`}
-                >
-                  <span className={`w-8 text-sm font-medium shrink-0 ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
-                    {DAY_NAMES[dayIdx]}{isToday && <span className="text-xs"> *</span>}
-                  </span>
-                  <Select value={assigned ?? '__rest__'} onValueChange={(v) => handleDayChange(dayIdx, v)}>
-                    <SelectTrigger className="h-8 text-sm flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__rest__">Rest Day</SelectItem>
-                      {templates.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )
-            })
-          )}
-        </CardContent>
-      </Card>
 
+          {/* Day pill strip */}
+          <div
+            className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1"
+            style={{ overscrollBehaviorX: 'contain', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+          >
+            {DISPLAY_DAYS.map((dayIdx) => {
+              const isToday = dayIdx === todayIdx
+              const isSelected = dayIdx === selectedDay
+              const hasTemplate = !!weekSchedule[dayIdx]
+              return (
+                <button
+                  key={dayIdx}
+                  onClick={() => setSelectedDay(dayIdx)}
+                  className={cn(
+                    'flex flex-col items-center gap-1 rounded-2xl px-3 py-3 min-w-[48px] min-h-[56px] transition-all shrink-0',
+                    isSelected
+                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
+                      : isToday
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
+                  )}
+                >
+                  <span className="text-[11px] font-medium">{DAY_LABELS[dayIdx]}</span>
+                  <span
+                    className={cn(
+                      'h-1.5 w-1.5 rounded-full',
+                      hasTemplate
+                        ? isSelected ? 'bg-primary-foreground' : 'bg-primary'
+                        : 'bg-transparent',
+                    )}
+                  />
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Selected day template picker */}
+          <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">
+                {DAY_LABELS[selectedDay]}{selectedDay === todayIdx ? ' (Today)' : ''}&nbsp;â€”&nbsp;
+                {weekSchedule[selectedDay]
+                  ? templates.find((t) => t.id === weekSchedule[selectedDay])?.name ?? 'Unknown'
+                  : 'Rest Day'}
+              </p>
+              <Select
+                value={weekSchedule[selectedDay] ?? '__rest__'}
+                onValueChange={(v) => handleDayChange(selectedDay, v)}
+              >
+                <SelectTrigger className="h-10 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__rest__">Rest Day</SelectItem>
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            <Button className="w-full" onClick={handleSaveSchedule}>Save Schedule</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Suggestions */}
       {suggestions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold text-sm">Suggested for You</h2>
-            <span className="text-xs text-muted-foreground capitalize">({profile?.goalType})</span>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Suggested for You
+            </p>
+            <Badge variant="outline" className="text-xs capitalize">{profile?.goalType}</Badge>
           </div>
           {suggestions.map((s) => (
-            <Card key={s.name} className="border-dashed">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{s.name}</CardTitle>
-                <p className="text-xs text-muted-foreground">{s.description}</p>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex flex-wrap gap-1">
-                  {s.exercises.map((te, i) => {
-                    const ex = exercises.find((e) => e.id === te.exerciseId)
-                    return (
-                      <Badge key={i} variant="outline" className="text-xs">
-                        {ex?.name ?? te.exerciseId} · {te.sets}×{te.reps}
-                      </Badge>
-                    )
-                  })}
-                </div>
-                <Button className="w-full" variant="secondary" onClick={() => adoptSuggestion(s)}>
-                  <Play className="h-4 w-4 mr-2" /> Start Now
-                </Button>
-              </CardContent>
-            </Card>
+            <div
+              key={s.name}
+              className="rounded-2xl border-l-4 border-l-primary/60 border border-border bg-card p-4 space-y-3"
+            >
+              <div>
+                <p className="font-semibold">{s.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.description}</p>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {s.exercises.map((te, i) => {
+                  const ex = exercises.find((e) => e.id === te.exerciseId)
+                  return (
+                    <Badge key={i} variant="secondary" className="text-xs">
+                      {ex?.name ?? te.exerciseId} · {te.sets}×{te.reps}
+                    </Badge>
+                  )
+                })}
+              </div>
+              <Button className="w-full" size="sm" onClick={() => adoptSuggestion(s)}>
+                <Play className="h-3.5 w-3.5 mr-1.5" /> Start Now
+              </Button>
+            </div>
           ))}
         </div>
       )}
 
+      {/* Empty state */}
       {templates.length === 0 && (
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            No templates yet. Create one to chain exercises into a full workout session.
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-border py-16 text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-muted">
+            <Dumbbell className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <p className="font-semibold text-base">Your training plan starts here</p>
+          <p className="mt-1.5 text-sm text-muted-foreground max-w-[220px]">
+            Create templates to chain exercises into structured workouts.
+          </p>
+          <Button className="mt-5" size="sm" onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-1.5" /> Create First Plan
+          </Button>
+        </div>
       )}
 
-      {templates.map((t) => {
-        const isActive = profile?.activeTemplateId === t.id
-        const nextIdx = isActive ? (profile?.activeTemplateExerciseIndex ?? 0) % t.exercises.length : null
-        return (
-        <Card key={t.id} className={isActive ? 'ring-2 ring-primary' : ''}>
-          <CardHeader className="pb-2">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-base">{t.name}</CardTitle>
-                  {isActive && <Badge className="text-xs bg-primary text-primary-foreground">Active Plan</Badge>}
-                </div>
-                {t.description && <p className="text-sm text-muted-foreground mt-0.5">{t.description}</p>}
-                {isActive && nextIdx !== null && (
-                  <p className="text-xs text-primary mt-0.5">
-                    Resume from exercise {nextIdx + 1}/{t.exercises.length}
+      {/* Template cards */}
+      <div className="space-y-4">
+        {templates.map((t) => {
+          const isActive = profile?.activeTemplateId === t.id
+          const nextIdx = isActive ? (profile?.activeTemplateExerciseIndex ?? 0) % t.exercises.length : null
+          const muscles = Array.from(new Set(
+            t.exercises.flatMap((te) =>
+              exercises.find((e) => e.id === te.exerciseId)?.targetMuscles ?? []
+            )
+          )).slice(0, 4)
+          const duration = estimateDuration(t.exercises.length)
+
+          return (
+            <Card
+              key={t.id}
+              className={cn(
+                'overflow-hidden rounded-2xl',
+                isActive && 'ring-2 ring-primary',
+              )}
+            >
+              {/* Active banner */}
+              {isActive && (
+                <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-primary">
+                    Active Plan · Exercise {(nextIdx ?? 0) + 1}/{t.exercises.length}
                   </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs text-muted-foreground px-2"
+                    onClick={() => setActiveTemplate(null)}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
+
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-base leading-tight">{t.name}</p>
+                    {t.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{t.description}</p>
+                    )}
+                    <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Dumbbell className="h-3 w-3" />
+                        {t.exercises.length} exercises
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        ~{duration} min
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-0.5 shrink-0">
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(t)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(t.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Muscle badges */}
+                {muscles.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {muscles.map((m) => (
+                      <Badge key={m} variant="secondary" className="text-xs">{m}</Badge>
+                    ))}
+                  </div>
                 )}
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(t.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex flex-wrap gap-1">
-              {t.exercises.slice(0, expandedId === t.id ? undefined : 3).map((te, i) => {
-                const ex = exercises.find((e) => e.id === te.exerciseId)
-                return (
-                  <Badge key={i} variant="secondary" className="text-xs">
-                    {ex?.name ?? te.exerciseId} · {te.sets}x{te.reps}
-                  </Badge>
-                )
-              })}
-              {t.exercises.length > 3 && (
-                <button
-                  className="text-xs text-muted-foreground underline"
-                  onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
-                >
-                  {expandedId === t.id ? <><ChevronUp className="inline h-3 w-3" /> less</> : <><ChevronDown className="inline h-3 w-3" /> +{t.exercises.length - 3} more</>}
-                </button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              {isActive ? (
-                <Button className="flex-1" onClick={() => { resumeActiveTemplate(); navigate('/log') }}>
-                  <Play className="h-4 w-4 mr-2" /> Resume Plan
-                </Button>
-              ) : (
-                <Button className="flex-1" onClick={() => handleStart(t)}>
-                  <Play className="h-4 w-4 mr-2" /> Start Workout
-                </Button>
-              )}
-              {isActive ? (
-                <Button variant="outline" size="sm" onClick={() => setActiveTemplate(null)}>
-                  Clear
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" onClick={() => setActiveTemplate(t.id)}>
-                  <BookmarkCheck className="h-4 w-4 mr-1" /> Set as Plan
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        )
-      })}
+
+                {/* Exercise list */}
+                <div className="flex flex-wrap gap-1">
+                  {t.exercises.slice(0, expandedId === t.id ? undefined : 3).map((te, i) => {
+                    const ex = exercises.find((e) => e.id === te.exerciseId)
+                    return (
+                      <span key={i} className="inline-flex items-center rounded-lg bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+                        {ex?.name ?? te.exerciseId} · {te.sets}×{te.reps}
+                      </span>
+                    )
+                  })}
+                  {t.exercises.length > 3 && (
+                    <button
+                      className="inline-flex items-center gap-0.5 rounded-lg bg-muted px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                    >
+                      {expandedId === t.id
+                        ? <><ChevronUp className="h-3 w-3" /> less</>
+                        : <><ChevronDown className="h-3 w-3" /> +{t.exercises.length - 3} more</>}
+                    </button>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-1">
+                  {isActive ? (
+                    <Button className="flex-1" onClick={() => { resumeActiveTemplate(); navigate('/log') }}>
+                      <Play className="h-4 w-4 mr-1.5" /> Resume Plan
+                    </Button>
+                  ) : (
+                    <Button className="flex-1" onClick={() => handleStart(t)}>
+                      <Play className="h-4 w-4 mr-1.5" /> Start Workout
+                    </Button>
+                  )}
+                  {!isActive && (
+                    <Button variant="outline" size="sm" onClick={() => setActiveTemplate(t.id)}>
+                      <BookmarkCheck className="h-3.5 w-3.5 mr-1" /> Set as Plan
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Template' : 'New Template'}</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Plan' : 'New Plan'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <div className="space-y-1.5">
               <Label>Name</Label>
               <Input {...register('name')} placeholder="e.g. Push Day A" />
-              {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
+              {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
-            <div>
-              <Label>Description (optional)</Label>
+            <div className="space-y-1.5">
+              <Label>Description <span className="text-muted-foreground">(optional)</span></Label>
               <Input {...register('description')} placeholder="Brief notes…" />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Exercises</Label>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
+                  className="h-7 text-xs gap-1"
                   onClick={handleOptimizeOrder}
-                  title="Sort exercises in optimal training order (compound first)"
                 >
-                  <Wand2 className="h-3.5 w-3.5 mr-1" /> Optimize Order
+                  <Wand2 className="h-3 w-3" /> Optimize Order
                 </Button>
               </div>
+
               {fields.map((field, idx) => (
-                <div key={field.id} className="flex gap-2 items-end">
-                  <div className="flex flex-col gap-0.5 shrink-0 pb-0.5">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-5 w-6"
-                      disabled={idx === 0}
-                      onClick={() => move(idx, idx - 1)}
-                    >
-                      <ArrowUp className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-5 w-6"
-                      disabled={idx === fields.length - 1}
-                      onClick={() => move(idx, idx + 1)}
-                    >
-                      <ArrowDown className="h-3 w-3" />
-                    </Button>
+                <div key={field.id} className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">Exercise {idx + 1}</span>
+                    <div className="flex gap-0.5">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        disabled={idx === 0}
+                        onClick={() => move(idx, idx - 1)}
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        disabled={idx === fields.length - 1}
+                        onClick={() => move(idx, idx + 1)}
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </Button>
+                      {fields.length > 1 && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-destructive"
+                          onClick={() => remove(idx)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <Select
-                      defaultValue={field.exerciseId}
-                      onValueChange={(v) => setValue(`exercises.${idx}.exerciseId`, v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pick exercise" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {exercises.map((e) => (
-                          <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.exercises?.[idx]?.exerciseId && (
-                      <p className="text-xs text-destructive mt-0.5">{errors.exercises[idx].exerciseId?.message}</p>
-                    )}
-                  </div>
-                  <div className="w-14">
-                    <Label className="text-xs">Sets</Label>
-                    <Input type="number" min={1} {...register(`exercises.${idx}.sets`)} />
-                  </div>
-                  <div className="w-14">
-                    <Label className="text-xs">Reps</Label>
-                    <Input type="number" min={1} {...register(`exercises.${idx}.reps`)} />
-                  </div>
-                  {fields.length > 1 && (
-                    <Button type="button" size="icon" variant="ghost" className="text-destructive mb-0.5" onClick={() => remove(idx)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+
+                  <Select
+                    defaultValue={field.exerciseId}
+                    onValueChange={(v) => setValue(`exercises.${idx}.exerciseId`, v)}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Pick exercise" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {exercises.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.exercises?.[idx]?.exerciseId && (
+                    <p className="text-xs text-destructive">{errors.exercises[idx].exerciseId?.message}</p>
                   )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Sets</Label>
+                      <Input type="number" min={1} className="h-9" {...register(`exercises.${idx}.sets`)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Reps</Label>
+                      <Input type="number" min={1} className="h-9" {...register(`exercises.${idx}.reps`)} />
+                    </div>
+                  </div>
                 </div>
               ))}
+
               {errors.exercises?.root && (
                 <p className="text-xs text-destructive">{errors.exercises.root.message}</p>
               )}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ exerciseId: '', sets: 3, reps: 10 })}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => append({ exerciseId: '', sets: 3, reps: 10 })}
+              >
                 <Plus className="h-4 w-4 mr-1" /> Add Exercise
               </Button>
             </div>
 
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Template</Button>
+              <Button type="submit">Save Plan</Button>
             </DialogFooter>
           </form>
         </DialogContent>

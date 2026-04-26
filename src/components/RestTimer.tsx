@@ -33,13 +33,19 @@ function playBeep(frequency = 880, durationSec = 0.25, volume = 0.4) {
 interface RestTimerProps {
   defaultSeconds?: number
   onComplete?: () => void
+  autoStart?: boolean
 }
 
-export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
+export function RestTimer({ defaultSeconds = 90, onComplete, autoStart = false }: RestTimerProps) {
   const [duration, setDuration] = useState(defaultSeconds)
   const [remaining, setRemaining] = useState(defaultSeconds)
   const [isRunning, setIsRunning] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Auto-start on mount when requested
+  useEffect(() => {
+    if (autoStart) setIsRunning(true)
+  }, [autoStart])
 
   const stopInterval = useCallback(() => {
     if (intervalRef.current) {
@@ -150,6 +156,23 @@ export function RestTimer({ defaultSeconds = 90, onComplete }: RestTimerProps) {
         >
           {isRunning ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
         </Button>
+      </div>
+
+      {/* Quick-pick presets */}
+      <div className="flex gap-2 w-full">
+        {[45, 60, 90, 120, 180].map((sec) => (
+          <button
+            key={sec}
+            onClick={() => handleDurationChange([sec])}
+            className={`flex-1 rounded-lg border py-1.5 text-xs font-medium transition-colors ${
+              duration === sec
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border bg-muted text-muted-foreground hover:border-primary/30 hover:text-foreground'
+            }`}
+          >
+            {sec < 60 ? `${sec}s` : `${sec / 60}m`}
+          </button>
+        ))}
       </div>
 
       {/* Duration slider */}

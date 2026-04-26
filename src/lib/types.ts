@@ -23,6 +23,7 @@ export interface WorkoutSet {
   notes?: string
   completed?: boolean
   restTime?: number
+  setType?: 'warmup' | 'working' | 'failure' | 'dropset'
 }
 
 export interface Workout {

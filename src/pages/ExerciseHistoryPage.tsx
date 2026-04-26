@@ -2,7 +2,10 @@
 import { useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
-import { ArrowLeft, Trophy } from 'lucide-react'
+import { ArrowLeft, Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+} from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +35,33 @@ export function ExerciseHistoryPage() {
       sessions.length > 0
         ? Math.max(...sessions.flatMap((w) => w.sets.map((s) => s.weight)))
         : 0,
+    [sessions],
+  )
+
+  // Trend: compare avg max-weight of last 3 sessions vs previous 3 sessions
+  const trend = useMemo(() => {
+    const recent = sessions.slice(0, 3)
+    const older = sessions.slice(3, 6)
+    if (recent.length === 0 || older.length === 0) return null
+    const avg = (arr: typeof sessions) =>
+      arr.reduce((sum, w) => sum + Math.max(...w.sets.map((s) => s.weight)), 0) / arr.length
+    const diff = avg(recent) - avg(older)
+    if (diff > 1) return { dir: 'up' as const, label: `+${diff.toFixed(1)}` }
+    if (diff < -1) return { dir: 'down' as const, label: diff.toFixed(1) }
+    return { dir: 'steady' as const, label: 'Steady' }
+  }, [sessions])
+
+  // Sparkline: last 6 sessions in chronological order
+  const sparkData = useMemo(
+    () =>
+      sessions
+        .slice(0, 6)
+        .reverse()
+        .map((w, i) => ({
+          i,
+          w: Math.max(...w.sets.map((s) => s.weight)),
+          date: format(new Date(w.date), 'MMM d'),
+        })),
     [sessions],
   )
 
@@ -70,6 +100,16 @@ export function ExerciseHistoryPage() {
         <Card>
           <CardContent className="p-3 text-center">
             <p className="text-xl font-bold">{maxWeightEver}{weightUnit}</p>
+            {trend && (
+              <div className="flex items-center justify-center gap-1 mt-0.5">
+                {trend.dir === 'up' && <TrendingUp className="h-3 w-3 text-green-500" />}
+                {trend.dir === 'down' && <TrendingDown className="h-3 w-3 text-destructive" />}
+                {trend.dir === 'steady' && <Minus className="h-3 w-3 text-muted-foreground" />}
+                <span className={`text-xs font-medium ${trend.dir === 'up' ? 'text-green-500' : trend.dir === 'down' ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {trend.label}
+                </span>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">Max Weight</p>
           </CardContent>
         </Card>
@@ -82,6 +122,36 @@ export function ExerciseHistoryPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Session list */}
+      {sparkData.length >= 2 && (
+        <Card className="mb-4">
+          <CardContent className="pt-4 pb-2 px-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+              Progress (last {sparkData.length} sessions)
+            </p>
+            <ResponsiveContainer width="100%" height={80}>
+              <LineChart data={sparkData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis hide domain={['auto', 'auto']} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  formatter={(value: number) => [`${value}${weightUnit}`, 'Max']}
+                  labelFormatter={(label) => label}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="w"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+                  activeDot={{ r: 5 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Session list */}
       {sessions.length === 0 ? (

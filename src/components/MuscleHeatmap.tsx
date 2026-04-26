@@ -41,11 +41,19 @@ function getSetsPerRegion(workouts: Workout[]): Record<string, number> {
 }
 
 function heatColor(sets: number): string {
-  if (sets === 0) return 'var(--heatmap-cold, #374151)'
-  if (sets <= 3) return '#22c55e'
-  if (sets <= 8) return '#f59e0b'
-  return '#ef4444'
+  if (sets === 0) return 'hsl(var(--muted))'
+  if (sets <= 3) return '#60a5fa'   // blue-400 — visible to deuteranopes & protanopes
+  if (sets <= 8) return '#f97316'   // orange-500 — distinct from blue
+  return '#7c3aed'                  // violet-600 — distinct from both
 }
+
+// Accessible legend labels with aria-friendly descriptions
+const LEGEND = [
+  { label: '0 sets', color: 'hsl(var(--muted))' },
+  { label: '1–3',    color: '#60a5fa' },
+  { label: '4–8',    color: '#f97316' },
+  { label: '9+',     color: '#7c3aed' },
+]
 
 // --- Front-body SVG regions ---
 interface Region { id: string; element: React.ReactNode }
@@ -124,13 +132,6 @@ function BodyOutline() {
     </g>
   )
 }
-
-const LEGEND = [
-  { label: '0 sets', color: '#374151' },
-  { label: '1–3', color: '#22c55e' },
-  { label: '4–8', color: '#f59e0b' },
-  { label: '9+', color: '#ef4444' },
-]
 
 export function MuscleHeatmap({ workouts, view }: Props) {
   const sets = useMemo(() => getSetsPerRegion(workouts), [workouts])

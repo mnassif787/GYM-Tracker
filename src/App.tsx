@@ -11,6 +11,7 @@ import { ExercisesPage } from '@/pages/ExercisesPage'
 import { MachinePage } from '@/pages/admin/MachinePage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { TemplatesPage } from '@/pages/TemplatesPage'
+import { SettingsPage } from '@/pages/SettingsPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { useWorkout } from '@/context/WorkoutContext'
 
@@ -23,6 +24,8 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* aria-live region for screen readers — sonner toasts write here */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only" id="sr-announcer" />
       <main className="pb-20">
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -34,6 +37,7 @@ export default function App() {
           <Route path="/exercises" element={<ExercisesPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/templates" element={<TemplatesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route
             path="/admin/machines"
             element={

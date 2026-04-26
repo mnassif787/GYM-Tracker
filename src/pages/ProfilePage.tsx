@@ -1,9 +1,9 @@
-// src/pages/ProfilePage.tsx
-import { useEffect } from 'react'
+﻿// src/pages/ProfilePage.tsx
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { User2, Scale, Ruler, Target, LayoutTemplate, Play } from 'lucide-react'
+import { User2, Scale, Ruler, Target, LayoutTemplate, Play, ChevronDown, ChevronUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,7 +41,6 @@ function calcBMI(weight: number, height: number) {
 }
 
 function calcTDEE(weight: number, height: number, age: number, gender: string, activity: string) {
-  // Mifflin-St Jeor
   const bmr = gender === 'female'
     ? 10 * weight + 6.25 * height - 5 * age - 161
     : 10 * weight + 6.25 * height - 5 * age + 5
@@ -60,19 +59,43 @@ function BodySilhouette({ scale }: { scale: number }) {
   const offset = (60 - w) / 2
   return (
     <svg viewBox="0 0 120 200" className="h-48 mx-auto" aria-label="Body silhouette">
-      {/* Head */}
       <ellipse cx="60" cy="22" rx={12 * scale} ry="13" fill="currentColor" className="text-muted-foreground" />
-      {/* Torso */}
       <rect x={offset + 30} y="40" width={w} height="70" rx="8" fill="currentColor" className="text-muted-foreground" />
-      {/* Left arm */}
       <rect x={offset + 30 - 14 * scale} y="44" width={12 * scale} height="55" rx="6" fill="currentColor" className="text-muted-foreground" />
-      {/* Right arm */}
       <rect x={offset + 30 + w + 2 * scale} y="44" width={12 * scale} height="55" rx="6" fill="currentColor" className="text-muted-foreground" />
-      {/* Left leg */}
       <rect x={offset + 30 + w * 0.05} y="112" width={w * 0.43} height="72" rx="6" fill="currentColor" className="text-muted-foreground" />
-      {/* Right leg */}
       <rect x={offset + 30 + w * 0.52} y="112" width={w * 0.43} height="72" rx="6" fill="currentColor" className="text-muted-foreground" />
     </svg>
+  )
+}
+
+function Section({
+  title, icon, children, defaultOpen = true,
+}: {
+  title: string
+  icon: React.ReactNode
+  children: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <Card className="rounded-2xl overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-accent/30 transition-colors"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <div className="flex items-center gap-2.5 font-semibold text-sm">
+          <span className="text-primary">{icon}</span>
+          {title}
+        </div>
+        {open
+          ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+      </button>
+      {open && <CardContent className="px-5 pb-5 pt-0 space-y-3">{children}</CardContent>}
+    </Card>
   )
 }
 
@@ -102,7 +125,6 @@ export function ProfilePage() {
     },
   })
 
-  // Populate when profile loads from DB
   useEffect(() => {
     if (profile) {
       setValue('name', profile.name ?? '')
@@ -158,108 +180,48 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="p-4 pb-24 space-y-4 max-w-lg mx-auto">
+    <div className="mx-auto max-w-lg px-4 pt-6 pb-28 space-y-4 page-transition">
       <h1 className="text-2xl font-bold flex items-center gap-2">
         <User2 className="h-6 w-6" /> Body Profile
       </h1>
 
-      {/* ── Today's Workout ───────────────────────────────────────────── */}
-      {(() => {
-        const todayIdx = new Date().getDay()
-        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-        const todayTemplateId = profile?.weekSchedule?.[todayIdx]
-        const todayTemplate = templates.find((t) => t.id === todayTemplateId)
-        const isActive = profile?.activeTemplateId === todayTemplateId
-        return (
-          <Card className="border-primary/30 bg-primary/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-primary uppercase tracking-wide">
-                Today — {dayNames[todayIdx]}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {todayTemplate ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold">{todayTemplate.name}</p>
-                    {isActive && <Badge variant="secondary" className="text-xs">Active Plan</Badge>}
-                  </div>
-                  {todayTemplate.description && (
-                    <p className="text-xs text-muted-foreground">{todayTemplate.description}</p>
-                  )}
-                  <div className="flex flex-wrap gap-1">
-                    {Array.from(new Set(
-                      todayTemplate.exercises.flatMap((te) =>
-                        exercises.find((e) => e.id === te.exerciseId)?.targetMuscles ?? []
-                      )
-                    )).slice(0, 6).map((m) => (
-                      <Badge key={m} variant="outline" className="text-xs">{m}</Badge>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    {isActive ? (
-                      <Button className="flex-1" onClick={() => { resumeActiveTemplate(); navigate('/log') }}>
-                        <Play className="h-4 w-4 mr-2" /> Resume Plan
-                      </Button>
-                    ) : (
-                      <Button className="flex-1" onClick={() => { startTemplate(todayTemplate); navigate('/log') }}>
-                        <Play className="h-4 w-4 mr-2" /> Start Today's Workout
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Rest Day — no workout scheduled.</p>
-                  <Button variant="outline" size="sm" onClick={() => navigate('/templates')}>
-                    Edit Schedule
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )
-      })()}
-
       {/* Live stats card */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Live Stats</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-4 items-center">
+      <Card className="rounded-2xl">
+        <CardContent className="flex gap-4 items-center pt-5">
           <BodySilhouette scale={bmiCat.scale} />
-          <div className="space-y-2 flex-1">
+          <div className="space-y-3 flex-1">
             <div>
               <p className="text-xs text-muted-foreground">BMI</p>
-              <p className="text-2xl font-bold">{bmi.toFixed(1)}</p>
-              <Badge className={`${bmiCat.color} text-white text-xs`}>{bmiCat.label}</Badge>
+              <p className="text-3xl font-bold">{bmi.toFixed(1)}</p>
+              <Badge className={`${bmiCat.color} text-white text-xs mt-0.5`}>{bmiCat.label}</Badge>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1"><Scale className="h-3 w-3" /> TDEE</p>
-              <p className="text-lg font-semibold">{tdee.toLocaleString()} kcal/day</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Scale className="h-3 w-3" /> TDEE
+              </p>
+              <p className="text-xl font-semibold">{tdee.toLocaleString()} kcal/day</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
         {/* Basic info */}
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base">Basic Info</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <Label>Your Name</Label>
-              <Input placeholder="e.g. Alex" {...register('name')} />
-            </div>
+        <Section title="Basic Info" icon={<User2 className="h-4 w-4" />}>
+          <div>
+            <Label>Your Name</Label>
+            <Input placeholder="e.g. Alex" {...register('name')} className="mt-1.5" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Age</Label>
-              <Input type="number" {...register('age')} />
-              {errors.age && <p className="text-xs text-destructive">{errors.age.message}</p>}
+              <Input type="number" {...register('age')} className="mt-1.5" />
+              {errors.age && <p className="text-xs text-destructive mt-1">{errors.age.message}</p>}
             </div>
             <div>
               <Label>Gender</Label>
               <Select defaultValue={watched.gender} onValueChange={(v) => setValue('gender', v as UserProfile['gender'])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="male">Male</SelectItem>
                   <SelectItem value="female">Female</SelectItem>
@@ -269,117 +231,106 @@ export function ProfilePage() {
             </div>
             <div>
               <Label>Height (cm)</Label>
-              <Input type="number" {...register('heightCm')} />
-              {errors.heightCm && <p className="text-xs text-destructive">{errors.heightCm.message}</p>}
+              <Input type="number" {...register('heightCm')} className="mt-1.5" />
+              {errors.heightCm && <p className="text-xs text-destructive mt-1">{errors.heightCm.message}</p>}
             </div>
             <div>
               <Label>Weight (kg)</Label>
-              <Input type="number" step="0.1" {...register('weightKg')} />
-              {errors.weightKg && <p className="text-xs text-destructive">{errors.weightKg.message}</p>}
+              <Input type="number" step="0.1" {...register('weightKg')} className="mt-1.5" />
+              {errors.weightKg && <p className="text-xs text-destructive mt-1">{errors.weightKg.message}</p>}
             </div>
             <div>
               <Label>Goal Weight (kg)</Label>
-              <Input type="number" step="0.1" placeholder="Optional" {...register('goalWeightKg')} />
+              <Input type="number" step="0.1" placeholder="Optional" {...register('goalWeightKg')} className="mt-1.5" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
 
-        {/* Goals */}
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Target className="h-4 w-4" /> Goals & Session</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <Label>Goal Type</Label>
-              <Select defaultValue={watched.goalType} onValueChange={(v) => setValue('goalType', v as UserProfile['goalType'])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="strength">Strength</SelectItem>
-                  <SelectItem value="hypertrophy">Hypertrophy (Muscle Gain)</SelectItem>
-                  <SelectItem value="fat-loss">Fat Loss</SelectItem>
-                  <SelectItem value="toning">Toning</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Activity Level</Label>
-              <Select defaultValue={watched.activityLevel} onValueChange={(v) => setValue('activityLevel', v as UserProfile['activityLevel'])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sedentary">Sedentary (desk job, no exercise)</SelectItem>
-                  <SelectItem value="light">Light (1-3 days/week)</SelectItem>
-                  <SelectItem value="moderate">Moderate (3-5 days/week)</SelectItem>
-                  <SelectItem value="active">Active (6-7 days/week)</SelectItem>
-                  <SelectItem value="very-active">Very Active (athlete / physical job)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Workout Time Limit (minutes)</Label>
-              <Input
-                type="number"
-                min={10}
-                max={180}
-                placeholder="e.g. 45 — leave blank for no limit"
-                {...register('workoutTimeLimitMin')}
-                className="mt-1"
-              />
-              <p className="text-xs text-muted-foreground mt-1">You'll get reminders at 5 min and 2 min remaining.</p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Goals & Session */}
+        <Section title="Goals & Session" icon={<Target className="h-4 w-4" />}>
+          <div>
+            <Label>Goal Type</Label>
+            <Select defaultValue={watched.goalType} onValueChange={(v) => setValue('goalType', v as UserProfile['goalType'])}>
+              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="strength">Strength</SelectItem>
+                <SelectItem value="hypertrophy">Hypertrophy (Muscle Gain)</SelectItem>
+                <SelectItem value="fat-loss">Fat Loss</SelectItem>
+                <SelectItem value="toning">Toning</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Activity Level</Label>
+            <Select defaultValue={watched.activityLevel} onValueChange={(v) => setValue('activityLevel', v as UserProfile['activityLevel'])}>
+              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sedentary">Sedentary (desk job)</SelectItem>
+                <SelectItem value="light">Light (1–3 days/week)</SelectItem>
+                <SelectItem value="moderate">Moderate (3–5 days/week)</SelectItem>
+                <SelectItem value="active">Active (6â€“7 days/week)</SelectItem>
+                <SelectItem value="very-active">Very Active (athlete)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Workout Time Limit (minutes)</Label>
+            <Input
+              type="number"
+              min={10}
+              max={180}
+              placeholder="e.g. 45 – leave blank for no limit"
+              {...register('workoutTimeLimitMin')}
+              className="mt-1.5"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Reminders at 5 min and 2 min remaining.</p>
+          </div>
+        </Section>
 
         {/* Body measurements */}
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Ruler className="h-4 w-4" /> Measurements (cm)</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3">
+        <Section title="Body Measurements (cm)" icon={<Ruler className="h-4 w-4" />} defaultOpen={false}>
+          <div className="grid grid-cols-2 gap-3">
             {(['chestCm', 'waistCm', 'hipsCm', 'armCm', 'thighCm'] as const).map((field) => (
               <div key={field}>
                 <Label>{field.replace('Cm', '').charAt(0).toUpperCase() + field.replace('Cm', '').slice(1)}</Label>
-                <Input type="number" step="0.1" placeholder="—" {...register(field)} />
+                <Input type="number" step="0.1" placeholder="â€”" {...register(field)} className="mt-1.5" />
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
 
-        <Button type="submit" className="w-full">Save Profile</Button>
+        <Button type="submit" className="w-full" size="lg">Save Profile</Button>
       </form>
 
-      {/* Active plan (outside form to avoid submit side-effects) */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <LayoutTemplate className="h-4 w-4" /> Active Workout Plan
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {activeTemplate ? (
-            <>
-              <div className="flex items-center gap-2">
-                <p className="font-medium text-sm">{activeTemplate.name}</p>
-                <Badge variant="secondary" className="text-xs">Active</Badge>
-              </div>
-              {profile?.activeTemplateExerciseIndex !== undefined && (
-                <p className="text-xs text-muted-foreground">
-                  Next exercise: #{(profile.activeTemplateExerciseIndex) + 1} of {activeTemplate.exercises.length}
-                </p>
-              )}
-              <div className="flex gap-2">
-                <Button className="flex-1" onClick={() => { resumeActiveTemplate(); navigate('/log') }}>
-                  <Play className="h-4 w-4 mr-2" /> Resume Plan
-                </Button>
-                <Button variant="outline" onClick={() => setActiveTemplate(null)}>Clear</Button>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-2">
-              <p className="text-sm text-muted-foreground mb-3">No active plan. Assign one in Templates.</p>
-              <Button variant="outline" size="sm" onClick={() => navigate('/templates')}>
-                <LayoutTemplate className="h-4 w-4 mr-2" /> Go to Templates
-              </Button>
+      {/* Active plan (outside form) */}
+      <Section title="Active Workout Plan" icon={<LayoutTemplate className="h-4 w-4" />} defaultOpen={!!activeTemplate}>
+        {activeTemplate ? (
+          <>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-sm">{activeTemplate.name}</p>
+              <Badge variant="secondary" className="text-xs">Active</Badge>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            {profile?.activeTemplateExerciseIndex !== undefined && (
+              <p className="text-xs text-muted-foreground">
+                Next: exercise #{(profile.activeTemplateExerciseIndex) + 1} of {activeTemplate.exercises.length}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={() => { resumeActiveTemplate(); navigate('/log') }}>
+                <Play className="h-4 w-4 mr-2" /> Resume Plan
+              </Button>
+              <Button variant="outline" onClick={() => setActiveTemplate(null)}>Clear</Button>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-2">
+            <p className="text-sm text-muted-foreground mb-3">No active plan. Assign one in Templates.</p>
+            <Button variant="outline" size="sm" onClick={() => navigate('/templates')}>
+              <LayoutTemplate className="h-4 w-4 mr-2" /> Go to Templates
+            </Button>
+          </div>
+        )}
+      </Section>
     </div>
   )
 }

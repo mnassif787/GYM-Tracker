@@ -1,9 +1,9 @@
-// src/components/WorkoutForm.tsx
+﻿// src/components/WorkoutForm.tsx
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Pencil, Trash2, CheckCircle2, TrendingUp } from 'lucide-react'
+import { Pencil, Trash2, CheckCircle2, TrendingUp, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +19,21 @@ const setSchema = z.object({
 })
 type SetForm = z.infer<typeof setSchema>
 
+type SetType = WorkoutSet['setType']
+
+const SET_TYPE_OPTIONS: { value: SetType; label: string; className: string }[] = [
+  { value: 'warmup',  label: 'Warm Up', className: 'bg-blue-500/10 text-blue-400 border-blue-500/30 data-[active=true]:bg-blue-500 data-[active=true]:text-white' },
+  { value: 'working', label: 'Working', className: 'bg-primary/10 text-primary border-primary/30 data-[active=true]:bg-primary data-[active=true]:text-primary-foreground' },
+  { value: 'failure', label: 'Failure', className: 'bg-red-500/10 text-red-400 border-red-500/30 data-[active=true]:bg-red-500 data-[active=true]:text-white' },
+  { value: 'dropset', label: 'Drop Set', className: 'bg-orange-500/10 text-orange-400 border-orange-500/30 data-[active=true]:bg-orange-500 data-[active=true]:text-white' },
+]
+
+/** Epley formula — reliable for 1–10 reps */
+function calcOneRM(weight: number, reps: number): number | null {
+  if (reps <= 0 || reps > 10) return null
+  return Math.round(weight * (1 + reps / 30))
+}
+
 interface WorkoutFormProps {
   sets: WorkoutSet[]
   weightUnit: string
@@ -28,6 +43,7 @@ interface WorkoutFormProps {
   onSetAdded: () => void
   smartRec?: SmartRecommendation | null
   currentSetIndex?: number
+  disabled?: boolean
 }
 
 export function WorkoutForm({
@@ -39,10 +55,12 @@ export function WorkoutForm({
   onSetAdded,
   smartRec,
   currentSetIndex = 0,
+  disabled = false,
 }: WorkoutFormProps) {
-  // Per-set hint: what did they do at this set index last time?
+  const [activeSetType, setActiveSetType] = useState<SetType>('working')
+  const [applyToAll, setApplyToAll] = useState(false)
+
   const lastSetAtIndex = smartRec?.lastSets[currentSetIndex]
-  // Default form values: use this set's last weight if available, else smartRec weight
   const defaultWeight = lastSetAtIndex?.weight ?? smartRec?.weight
   const defaultReps = lastSetAtIndex?.reps ?? smartRec?.reps
 
@@ -60,10 +78,9 @@ export function WorkoutForm({
     },
   })
 
-  // Update defaults when set index changes (next set)
   useEffect(() => {
-    const w = (smartRec?.lastSets[currentSetIndex]?.weight ?? smartRec?.weight)
-    const r = (smartRec?.lastSets[currentSetIndex]?.reps ?? smartRec?.reps)
+    const w = smartRec?.lastSets[currentSetIndex]?.weight ?? smartRec?.weight
+    const r = smartRec?.lastSets[currentSetIndex]?.reps ?? smartRec?.reps
     if (w) setValue('weight', w)
     if (r) setValue('reps', r)
   }, [currentSetIndex, smartRec, setValue])
@@ -76,14 +93,15 @@ export function WorkoutForm({
       notes: data.notes,
       timestamp: new Date().toISOString(),
       completed: true,
+      setType: activeSetType,
     }
     onAddSet(newSet)
-    // Pre-fill next set with last session's data for that index
     const nextIdx = currentSetIndex + 1
     const nextLast = smartRec?.lastSets[nextIdx]
+    const useRec = applyToAll && smartRec
     reset({
-      weight: nextLast?.weight ?? data.weight,
-      reps: nextLast?.reps ?? data.reps,
+      weight: useRec ? (smartRec.lastSets[nextIdx]?.weight ?? smartRec.weight) : (nextLast?.weight ?? data.weight),
+      reps: useRec ? (smartRec.lastSets[nextIdx]?.reps ?? smartRec.reps) : (nextLast?.reps ?? data.reps),
       notes: '',
     })
     onSetAdded()
@@ -118,8 +136,43 @@ export function WorkoutForm({
           >
             Apply suggestion
           </Button>
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={applyToAll}
+              onClick={() => setApplyToAll((v) => !v)}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${applyToAll ? 'bg-primary' : 'bg-muted'}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${applyToAll ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+            <span
+              className="text-xs text-muted-foreground cursor-pointer select-none"
+              onClick={() => setApplyToAll((v) => !v)}
+            >
+              Apply to all remaining sets
+            </span>
+          </div>
         </div>
       )}
+
+      {/* Set type selector */}
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Set Type</p>
+        <div className="grid grid-cols-4 gap-1.5">
+          {SET_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              data-active={activeSetType === opt.value}
+              onClick={() => setActiveSetType(opt.value)}
+              className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition-all ${opt.className}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Add set form */}
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
@@ -164,10 +217,17 @@ export function WorkoutForm({
           />
         </div>
 
-        <Button type="submit" className="w-full">
+        <Button type="submit" className="w-full" disabled={disabled}>
           <CheckCircle2 className="mr-2 h-4 w-4" />
           Log Set {sets.length + 1}
         </Button>
+
+        {disabled && (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Time limit reached — complete your workout to save your progress.
+          </div>
+        )}
       </form>
 
       {/* Logged sets */}
@@ -192,13 +252,21 @@ export function WorkoutForm({
   )
 }
 
-// ─── Individual set row (inline edit) ────────────────────────────────────────
+// ─── Set row ──────────────────────────────────────────────────────────────────
+
 interface SetRowProps {
   set: WorkoutSet
   index: number
   weightUnit: string
   onUpdate: (partial: Partial<WorkoutSet>) => void
   onRemove: () => void
+}
+
+const SET_TYPE_BADGE: Record<NonNullable<SetType>, { label: string; className: string }> = {
+  warmup:  { label: 'W/U',  className: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  working: { label: 'Work', className: 'bg-primary/10 text-primary border-primary/20' },
+  failure: { label: 'Fail', className: 'bg-red-500/10 text-red-400 border-red-500/20' },
+  dropset: { label: 'Drop', className: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
 }
 
 function SetRow({ set, index, weightUnit, onUpdate, onRemove }: SetRowProps) {
@@ -211,9 +279,17 @@ function SetRow({ set, index, weightUnit, onUpdate, onRemove }: SetRowProps) {
     setEditing(false)
   }
 
+  const oneRM = calcOneRM(set.weight, set.reps)
+  const typeBadge = set.setType ? SET_TYPE_BADGE[set.setType] : null
+
   return (
     <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
       <Badge variant="outline" className="shrink-0">Set {index}</Badge>
+      {typeBadge && (
+        <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium border ${typeBadge.className}`}>
+          {typeBadge.label}
+        </span>
+      )}
       {editing ? (
         <div className="flex flex-1 items-center gap-2">
           <input
@@ -239,6 +315,11 @@ function SetRow({ set, index, weightUnit, onUpdate, onRemove }: SetRowProps) {
             {set.weight}{weightUnit} × {set.reps} reps
             {set.notes && <span className="ml-2 text-xs text-muted-foreground">— {set.notes}</span>}
           </span>
+          {oneRM && (
+            <span className="shrink-0 text-xs text-muted-foreground tabular-nums" title="Estimated 1RM (Epley)">
+              ~{oneRM}{weightUnit} 1RM
+            </span>
+          )}
           <Button
             size="icon"
             variant="ghost"
