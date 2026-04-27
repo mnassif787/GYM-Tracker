@@ -477,3 +477,92 @@ export function sortExercisesByOptimalOrder(
     return getExercisePriority(exA) - getExercisePriority(exB)
   })
 }
+
+// ─── Template scheduling helpers ─────────────────────────────────────────────
+
+/** Returns the set of primary muscle groups targeted by a template. */
+export function getTemplateMuscleGroups(
+  template: import('./types').WorkoutTemplate,
+  exercises: Exercise[],
+): string[] {
+  const muscles = new Set<string>()
+  template.exercises.forEach((te) => {
+    const ex = exercises.find((e) => e.id === te.exerciseId)
+    if (ex?.targetMuscles[0]) muscles.add(ex.targetMuscles[0])
+  })
+  return Array.from(muscles)
+}
+
+/**
+ * Builds a smart weekly schedule by assigning templates to training days,
+ * minimising consecutive-day muscle group overlap.
+ * Uses a greedy algorithm: for each training day, picks the template with
+ * the least muscle overlap vs the previous day, breaking ties by usage count.
+ */
+export function buildSmartWeekSchedule(
+  templates: import('./types').WorkoutTemplate[],
+  exercises: Exercise[],
+  daysPerWeek = 4,
+): Partial<Record<number, string>> {
+  if (templates.length === 0) return {}
+
+  const TRAINING_DAYS: Record<number, number[]> = {
+    2: [1, 4],
+    3: [1, 3, 5],
+    4: [1, 2, 4, 5],
+    5: [1, 2, 3, 4, 5],
+    6: [1, 2, 3, 4, 5, 6],
+  }
+  const days = TRAINING_DAYS[Math.min(6, Math.max(2, daysPerWeek))] ?? [1, 3, 5]
+
+  const tmplMuscles = templates.map((t) => ({
+    id: t.id,
+    muscles: getTemplateMuscleGroups(t, exercises),
+  }))
+
+  const schedule: Partial<Record<number, string>> = {}
+  const usedCount = new Map(templates.map((t) => [t.id, 0]))
+  let prevMuscles: string[] = []
+
+  for (const day of days) {
+    const scored = tmplMuscles
+      .map((tm) => ({
+        id: tm.id,
+        score:
+          tm.muscles.filter((m) => prevMuscles.includes(m)).length * 100 +
+          (usedCount.get(tm.id) ?? 0),
+      }))
+      .sort((a, b) => a.score - b.score)
+    const chosen = scored[0].id
+    schedule[day] = chosen
+    usedCount.set(chosen, (usedCount.get(chosen) ?? 0) + 1)
+    prevMuscles = tmplMuscles.find((tm) => tm.id === chosen)?.muscles ?? []
+  }
+
+  return schedule
+}
+
+// ─── Alternative exercise finder ─────────────────────────────────────────────
+
+/**
+ * Returns up to `count` alternative exercises targeting the same primary muscle,
+ * excluding the current exercise. Most similar (highest muscle overlap) first.
+ */
+export function getAlternativeExercises(
+  exerciseId: string,
+  allExercises: Exercise[],
+  count = 5,
+): Exercise[] {
+  const current = allExercises.find((e) => e.id === exerciseId)
+  if (!current) return []
+  const primaryMuscle = current.targetMuscles[0]
+  return allExercises
+    .filter((e) => e.id !== exerciseId && e.targetMuscles.includes(primaryMuscle))
+    .map((e) => ({
+      exercise: e,
+      overlap: e.targetMuscles.filter((m) => current.targetMuscles.includes(m)).length,
+    }))
+    .sort((a, b) => b.overlap - a.overlap)
+    .slice(0, count)
+    .map((item) => item.exercise)
+}

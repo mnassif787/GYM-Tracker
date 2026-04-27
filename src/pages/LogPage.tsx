@@ -1,7 +1,7 @@
 ﻿// src/pages/LogPage.tsx
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QrCode, CheckCircle2, Play, Clock, AlertTriangle, Shuffle, LayoutTemplate, Calculator } from 'lucide-react'
+import { QrCode, CheckCircle2, Play, Clock, AlertTriangle, Shuffle, LayoutTemplate, Calculator, ListOrdered } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { WorkoutForm } from '@/components/WorkoutForm'
 import { RestTimer } from '@/components/RestTimer'
 import { useWorkout } from '@/context/WorkoutContext'
+import { getAlternativeExercises } from '@/lib/exercises'
 
 // â”€â”€â”€ Session countdown timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function SessionTimer({
@@ -96,6 +97,7 @@ export function LogPage() {
     pendingTemplateExercise, startWorkout, clearPendingTemplate,
     getSmartRec, profile, sessionStartTime,
     runningTemplateId, templates, exercises, startTemplate,
+    swapCurrentExercise, templateQueue, templateQueueIndex,
   } = useWorkout()
 
   const [showRestTimer, setShowRestTimer] = useState(false)
@@ -111,11 +113,8 @@ export function LogPage() {
     const plannedEntry = runningTemplate?.exercises.find(
       (te) => te.exerciseId === pendingTemplateExercise.id,
     )
-    const exercisePosition = runningTemplate
-      ? runningTemplate.exercises.findIndex((te) => te.exerciseId === pendingTemplateExercise.id)
-      : -1
-    const totalExercises = runningTemplate?.exercises.length ?? 0
-    const exercisesDone = exercisePosition >= 0 ? exercisePosition : 0
+    const exercisesDone = templateQueueIndex
+    const totalExercises = templateQueue.length
 
     return (
       <div className="mx-auto max-w-md px-4 py-12 page-transition">
@@ -153,7 +152,7 @@ export function LogPage() {
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              {exercisePosition >= 0 ? `Exercise ${exercisePosition + 1} of ${totalExercises}` : 'Up Next'}
+              {totalExercises > 0 ? `Exercise ${exercisesDone + 1} of ${totalExercises}` : 'Up Next'}
             </p>
             <h2 className="text-2xl font-bold mt-1">{pendingTemplateExercise.name}</h2>
             <p className="text-sm text-muted-foreground mt-1">
@@ -164,8 +163,31 @@ export function LogPage() {
                 {plannedEntry.sets} sets × {plannedEntry.reps} reps
               </p>
             )}
+            {totalExercises > 1 && (
+              <p className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <ListOrdered className="h-3 w-3" /> Sorted: compound exercises first
+              </p>
+            )}
           </div>
         </div>
+
+        {/* Upcoming exercises */}
+        {templateQueue.slice(templateQueueIndex + 1, templateQueueIndex + 3).length > 0 && (
+          <div className="mt-4 rounded-2xl border border-border bg-muted/30 p-3 space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Coming Up</p>
+            {templateQueue.slice(templateQueueIndex + 1, templateQueueIndex + 3).map((ex, i) => (
+              <div key={ex.id} className="flex items-center gap-2.5">
+                <span className="h-5 w-5 rounded-full bg-muted text-[11px] font-bold text-muted-foreground flex items-center justify-center shrink-0">
+                  {exercisesDone + i + 2}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium truncate">{ex.name}</p>
+                  <p className="text-xs text-muted-foreground">{ex.targetMuscles[0]}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="mt-8 space-y-2.5">
           <Button className="w-full" size="lg" onClick={() => startWorkout(pendingTemplateExercise)}>
@@ -216,7 +238,34 @@ export function LogPage() {
               <DialogHeader>
                 <DialogTitle>Switch Exercise</DialogTitle>
               </DialogHeader>
-              <p className="text-xs text-muted-foreground mb-3">Jump to any exercise in this template.</p>
+
+              {/* Alternatives — same primary muscle from full library */}
+              {getAlternativeExercises(pendingTemplateExercise.id, exercises).length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-primary mb-2">Machine busy? Same muscle — try instead</p>
+                  <div className="space-y-2 mb-4">
+                    {getAlternativeExercises(pendingTemplateExercise.id, exercises).map((alt) => (
+                      <button
+                        key={alt.id}
+                        className="w-full text-left rounded-xl border border-border px-4 py-3 transition-colors hover:bg-accent hover:border-primary/40"
+                        onClick={() => {
+                          swapCurrentExercise(alt.id)
+                          setShowSwitchDialog(false)
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-sm">{alt.name}</p>
+                          <Badge variant="outline" className="text-xs border-primary/40 text-primary shrink-0">Swap</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{alt.targetMuscles.join(', ')}</p>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="border-t border-border mb-3" />
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Jump to template exercise</p>
+                </>
+              )}
+
               <div className="space-y-2">
                 {runningTemplate.exercises.map((te, idx) => {
                   const ex = exercises.find((e) => e.id === te.exerciseId)

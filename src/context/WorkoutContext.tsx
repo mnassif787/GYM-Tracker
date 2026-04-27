@@ -15,7 +15,7 @@ import {
   saveTemplate as dbSaveTemplate,
   deleteTemplate as dbDeleteTemplate,
 } from '@/lib/db'
-import { DEFAULT_EXERCISES, getRecommendedWeight, getSmartRecommendation } from '@/lib/exercises'
+import { DEFAULT_EXERCISES, getRecommendedWeight, getSmartRecommendation, sortExercisesByOptimalOrder } from '@/lib/exercises'
 import type { SmartRecommendation } from '@/lib/exercises'
 import { generateDemoWorkouts } from '@/lib/demoData'
 
@@ -52,6 +52,9 @@ interface WorkoutContextValue {
   clearPendingTemplate: () => void
   runningTemplateId: string | null
   saveWeekSchedule: (schedule: Partial<Record<number, string>>) => Promise<void>
+  templateQueue: Exercise[]
+  templateQueueIndex: number
+  swapCurrentExercise: (alternativeExerciseId: string) => void
 }
 
 const WorkoutContext = createContext<WorkoutContextValue | null>(null)
@@ -299,8 +302,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   }, [profile])
 
   const startTemplate = useCallback((template: WorkoutTemplate, startAt = 0) => {
-    const allEx = template.exercises
-      .map((te) => exercises.find((e) => e.id === te.exerciseId))
+    const sortedIds = sortExercisesByOptimalOrder(
+      template.exercises.map((te) => te.exerciseId),
+      exercises,
+    )
+    const allEx = sortedIds
+      .map((id) => exercises.find((e) => e.id === id))
       .filter((e): e is Exercise => e !== undefined)
     const queue = allEx.slice(startAt)
     if (queue.length === 0) { toast.error('No valid exercises in this template.'); return }
@@ -347,6 +354,18 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     if (value) { localStorage.setItem('isAdmin', 'true') } else { localStorage.removeItem('isAdmin') }
   }, [])
 
+  const swapCurrentExercise = useCallback((alternativeExerciseId: string) => {
+    const alt = exercises.find((e) => e.id === alternativeExerciseId)
+    if (!alt) { toast.error('Exercise not found.'); return }
+    setTemplateQueue((prev) => {
+      const updated = [...prev]
+      if (updated[templateQueueIndex] !== undefined) updated[templateQueueIndex] = alt
+      return updated
+    })
+    setPendingTemplateExercise(alt)
+    toast.info(`Swapped to ${alt.name}`, { description: `${alt.targetMuscles[0]} · same muscle group` })
+  }, [exercises, templateQueueIndex])
+
   return (
     <WorkoutContext.Provider value={{
       currentExercise, currentWorkout, workoutHistory, exercises, isAdminMode,
@@ -358,6 +377,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       resumeActiveTemplate, setActiveTemplate,
       pendingTemplateExercise, clearPendingTemplate,
       runningTemplateId, saveWeekSchedule,
+      templateQueue, templateQueueIndex, swapCurrentExercise,
     }}>
       {children}
     </WorkoutContext.Provider>

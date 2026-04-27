@@ -20,29 +20,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useWorkout } from '@/context/WorkoutContext'
 import type { WorkoutTemplate } from '@/lib/types'
 import { getSuggestionsForGoal, type SuggestedTemplate } from '@/lib/suggestedTemplates'
-import { sortExercisesByOptimalOrder } from '@/lib/exercises'
+import { sortExercisesByOptimalOrder, buildSmartWeekSchedule, getTemplateMuscleGroups } from '@/lib/exercises'
 import { cn } from '@/lib/utils'
 
 // â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const DISPLAY_DAYS = [1, 2, 3, 4, 5, 6, 0]
-
-function autoAssignSchedule(
-  goalType: string,
-  tmplList: WorkoutTemplate[],
-): Partial<Record<number, string>> {
-  if (tmplList.length === 0) return {}
-  const trainingDays: Record<string, number[]> = {
-    strength:    [1, 3, 5, 6],
-    hypertrophy: [1, 2, 3, 4, 5, 6],
-    'fat-loss':  [1, 3, 5],
-    toning:      [1, 3, 5],
-  }
-  const days = trainingDays[goalType] ?? [1, 3, 5]
-  const schedule: Partial<Record<number, string>> = {}
-  days.forEach((day, i) => { schedule[day] = tmplList[i % tmplList.length].id })
-  return schedule
-}
 
 const templateSchema = z.object({
   name: z.string().min(1, 'Name required'),
@@ -83,6 +66,27 @@ export function TemplatesPage() {
     if (!profile?.goalType) return []
     return getSuggestionsForGoal(profile.goalType, templates.map((t) => t.name))
   }, [profile?.goalType, templates])
+
+  const [daysPerWeek, setDaysPerWeek] = useState(4)
+
+  const muscleConflicts = useMemo(() => {
+    const conflicts = new Set<number>()
+    for (let i = 0; i < DISPLAY_DAYS.length; i++) {
+      const dayA = DISPLAY_DAYS[i]
+      const dayB = DISPLAY_DAYS[(i + 1) % DISPLAY_DAYS.length]
+      if (!weekSchedule[dayA] || !weekSchedule[dayB]) continue
+      const tmplA = templates.find((t) => t.id === weekSchedule[dayA])
+      const tmplB = templates.find((t) => t.id === weekSchedule[dayB])
+      if (!tmplA || !tmplB) continue
+      const musclesA = getTemplateMuscleGroups(tmplA, exercises)
+      const musclesB = getTemplateMuscleGroups(tmplB, exercises)
+      if (musclesA.some((m) => musclesB.includes(m))) {
+        conflicts.add(dayA)
+        conflicts.add(dayB)
+      }
+    }
+    return conflicts
+  }, [weekSchedule, templates, exercises])
 
   async function adoptSuggestion(s: SuggestedTemplate) {
     const template: WorkoutTemplate = {
@@ -148,8 +152,7 @@ export function TemplatesPage() {
   }
 
   function handleAutoAssign() {
-    if (!profile?.goalType) return
-    setWeekSchedule(autoAssignSchedule(profile.goalType, templates))
+    setWeekSchedule(buildSmartWeekSchedule(templates, exercises, daysPerWeek))
   }
 
   async function handleDelete(id: string) {
@@ -178,12 +181,27 @@ export function TemplatesPage() {
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Weekly Schedule
             </p>
-            <div className="flex gap-2">
-              {profile?.goalType && (
-                <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={handleAutoAssign}>
-                  <Wand2 className="h-3 w-3" /> Auto-fill
-                </Button>
-              )}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-muted-foreground">Days:</span>
+                {[3, 4, 5, 6].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDaysPerWeek(d)}
+                    className={cn(
+                      'h-6 w-6 rounded-full text-[11px] font-bold transition-colors',
+                      daysPerWeek === d
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-accent',
+                    )}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={handleAutoAssign}>
+                <Wand2 className="h-3 w-3" /> Smart Fill
+              </Button>
             </div>
           </div>
 
@@ -213,7 +231,9 @@ export function TemplatesPage() {
                   <span
                     className={cn(
                       'h-1.5 w-1.5 rounded-full',
-                      hasTemplate
+                      hasTemplate && muscleConflicts.has(dayIdx)
+                        ? 'bg-amber-400'
+                        : hasTemplate
                         ? isSelected ? 'bg-primary-foreground' : 'bg-primary'
                         : 'bg-transparent',
                     )}
@@ -225,12 +245,30 @@ export function TemplatesPage() {
 
           {/* Selected day template picker */}
           <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">
+            <div>
+              <p className="text-xs text-muted-foreground">
                 {DAY_LABELS[selectedDay]}{selectedDay === todayIdx ? ' (Today)' : ''}&nbsp;â€”&nbsp;
                 {weekSchedule[selectedDay]
                   ? templates.find((t) => t.id === weekSchedule[selectedDay])?.name ?? 'Unknown'
                   : 'Rest Day'}
               </p>
+              {weekSchedule[selectedDay] && (() => {
+                const tmpl = templates.find((t) => t.id === weekSchedule[selectedDay])
+                const muscles = tmpl ? getTemplateMuscleGroups(tmpl, exercises) : []
+                return muscles.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {muscles.map((m) => (
+                      <Badge key={m} variant="secondary" className="text-xs">{m}</Badge>
+                    ))}
+                    {muscleConflicts.has(selectedDay) && (
+                      <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-500 bg-amber-500/10">
+                        ⚠ Overlaps adjacent day
+                      </Badge>
+                    )}
+                  </div>
+                ) : null
+              })()}
+            </div>
               <Select
                 value={weekSchedule[selectedDay] ?? '__rest__'}
                 onValueChange={(v) => handleDayChange(selectedDay, v)}
