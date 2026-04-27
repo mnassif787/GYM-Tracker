@@ -10,7 +10,7 @@ import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/GYM-Tracker">
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
         <WorkoutProvider>
           <App />
