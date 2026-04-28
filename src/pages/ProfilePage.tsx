@@ -175,6 +175,7 @@ export function ProfilePage() {
       weightLog: profile?.weightLog ?? [],
       activeTemplateId: profile?.activeTemplateId,
       activeTemplateExerciseIndex: profile?.activeTemplateExerciseIndex,
+      weekSchedule: profile?.weekSchedule,
     }
     await saveProfileData(p)
   }

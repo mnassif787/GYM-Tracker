@@ -1,7 +1,7 @@
 ﻿// src/pages/LogPage.tsx
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QrCode, CheckCircle2, Play, Clock, AlertTriangle, Shuffle, LayoutTemplate, Calculator, ListOrdered } from 'lucide-react'
+import { QrCode, CheckCircle2, Play, Clock, AlertTriangle, Shuffle, LayoutTemplate, Calculator, ListOrdered, Trophy, Timer } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -97,7 +97,7 @@ export function LogPage() {
     pendingTemplateExercise, startWorkout, clearPendingTemplate,
     getSmartRec, profile, sessionStartTime,
     runningTemplateId, templates, exercises, startTemplate,
-    swapCurrentExercise, templateQueue, templateQueueIndex,
+    swapCurrentExercise, jumpToTemplateExercise, templateQueue, templateQueueIndex,
   } = useWorkout()
 
   const [showRestTimer, setShowRestTimer] = useState(false)
@@ -105,9 +105,57 @@ export function LogPage() {
   const [showPlateCalc, setShowPlateCalc] = useState(false)
   const [isTimeLimitReached, setIsTimeLimitReached] = useState(false)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
+  const [completionSummary, setCompletionSummary] = useState<{
+    templateName: string; exercisesCompleted: number; durationMin: number
+  } | null>(null)
 
   const smartRec = currentExercise ? getSmartRec(currentExercise.id) : null
   const runningTemplate = templates.find((t) => t.id === runningTemplateId)
+
+  // Workout completion summary screen
+  if (completionSummary) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center page-transition space-y-6">
+        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-3xl bg-primary/10">
+          <Trophy className="h-12 w-12 text-primary" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Workout Complete!</p>
+          <h2 className="text-2xl font-bold mt-1">{completionSummary.templateName}</h2>
+          <p className="text-sm text-muted-foreground mt-1">Amazing work — session finished 💪</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Exercises</p>
+            <p className="text-2xl font-bold text-primary">{completionSummary.exercisesCompleted}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-xs text-muted-foreground">Duration</p>
+            <p className="text-2xl font-bold text-primary">
+              {completionSummary.durationMin > 0 ? `${completionSummary.durationMin}m` : '—'}
+            </p>
+          </div>
+        </div>
+        <div className="space-y-2.5 pt-2">
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={() => { setCompletionSummary(null); navigate('/history') }}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-2" /> View in History
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            size="lg"
+            onClick={() => { setCompletionSummary(null); navigate('/') }}
+          >
+            Back to Home
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   if (!currentExercise && pendingTemplateExercise) {
     const plannedEntry = runningTemplate?.exercises.find(
@@ -267,10 +315,11 @@ export function LogPage() {
               )}
 
               <div className="space-y-2">
-                {runningTemplate.exercises.map((te, idx) => {
+                {runningTemplate.exercises.map((te) => {
                   const ex = exercises.find((e) => e.id === te.exerciseId)
                   if (!ex) return null
                   const isCurrent = ex.id === pendingTemplateExercise.id
+                  const isInQueue = templateQueue.some((q) => q.id === ex.id)
                   return (
                     <button
                       key={te.exerciseId}
@@ -279,13 +328,17 @@ export function LogPage() {
                       }`}
                       onClick={() => {
                         setShowSwitchDialog(false)
-                        startTemplate(runningTemplate, idx)
-                        startWorkout(ex)
+                        if (isInQueue && !isCurrent) jumpToTemplateExercise(ex.id)
                       }}
+                      disabled={!isInQueue || isCurrent}
                     >
                       <div className="flex items-center justify-between">
                         <p className="font-semibold text-sm">{ex.name}</p>
-                        {isCurrent && <Badge className="text-xs">Current</Badge>}
+                        {isCurrent
+                          ? <Badge className="text-xs">Current</Badge>
+                          : !isInQueue
+                          ? <Badge variant="outline" className="text-xs text-muted-foreground">Done</Badge>
+                          : null}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">{ex.targetMuscles.join(', ')}</p>
                       <p className="text-xs text-muted-foreground">{te.sets} sets × {te.reps} reps</p>
@@ -324,12 +377,33 @@ export function LogPage() {
   async function handleComplete() {
     const setsCount = currentWorkout!.sets.length
     const totalVol = currentWorkout!.sets.reduce((s, set) => s + set.weight * set.reps, 0)
+
+    // Capture before completeWorkout clears state
+    const isInTemplate = templateQueue.length > 0
+    const isLastInTemplate = isInTemplate && templateQueueIndex >= templateQueue.length - 1
+    const capturedSessionStart = sessionStartTime
+    const capturedTemplateName = runningTemplate?.name
+    const capturedQueueLength = templateQueue.length
+
     await completeWorkout()
     toast.success(
       `${currentExercise!.name} done! ${setsCount} set${setsCount !== 1 ? 's' : ''} · ${totalVol.toLocaleString()} ${currentWorkout!.weightUnit ?? 'kg'} volume 💪`,
       { duration: 4000 },
     )
-    if (!pendingTemplateExercise) navigate('/history')
+
+    if (isLastInTemplate) {
+      const durationMin = capturedSessionStart
+        ? Math.floor((Date.now() - capturedSessionStart.getTime()) / 60000)
+        : 0
+      setCompletionSummary({
+        templateName: capturedTemplateName ?? 'Workout',
+        exercisesCompleted: capturedQueueLength,
+        durationMin,
+      })
+    } else if (!isInTemplate) {
+      navigate('/history')
+    }
+    // Mid-template: don't navigate — React will show the pending exercise screen
   }
 
   // â”€â”€â”€ Active workout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

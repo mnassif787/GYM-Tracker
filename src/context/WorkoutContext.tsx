@@ -55,6 +55,7 @@ interface WorkoutContextValue {
   templateQueue: Exercise[]
   templateQueueIndex: number
   swapCurrentExercise: (alternativeExerciseId: string) => void
+  jumpToTemplateExercise: (exerciseId: string) => void
 }
 
 const WorkoutContext = createContext<WorkoutContextValue | null>(null)
@@ -317,7 +318,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setRunningTemplateId(template.id)
     setRunningTemplateStartIdx(startAt)
     startWorkout(queue[0])
-  }, [exercises, startWorkout])
+    // Persist activeTemplateId so the Resume button works across page visits
+    if (profile) {
+      const updated = { ...profile, activeTemplateId: template.id }
+      dbSaveProfile(updated).then(() => setProfile(updated)).catch(() => {})
+    }
+  }, [exercises, startWorkout, profile])
 
   const resumeActiveTemplate = useCallback(() => {
     if (!profile?.activeTemplateId) {
@@ -366,6 +372,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     toast.info(`Swapped to ${alt.name}`, { description: `${alt.targetMuscles[0]} · same muscle group` })
   }, [exercises, templateQueueIndex])
 
+  const jumpToTemplateExercise = useCallback((exerciseId: string) => {
+    const idx = templateQueue.findIndex((e) => e.id === exerciseId)
+    if (idx < 0) { toast.error('Exercise not in current queue.'); return }
+    setTemplateQueueIndex(idx)
+    setPendingTemplateExercise(templateQueue[idx])
+    setCurrentExercise(null)
+    setCurrentWorkout(null)
+  }, [templateQueue])
+
   return (
     <WorkoutContext.Provider value={{
       currentExercise, currentWorkout, workoutHistory, exercises, isAdminMode,
@@ -377,7 +392,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       resumeActiveTemplate, setActiveTemplate,
       pendingTemplateExercise, clearPendingTemplate,
       runningTemplateId, saveWeekSchedule,
-      templateQueue, templateQueueIndex, swapCurrentExercise,
+      templateQueue, templateQueueIndex, swapCurrentExercise, jumpToTemplateExercise,
     }}>
       {children}
     </WorkoutContext.Provider>

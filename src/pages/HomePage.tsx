@@ -1,6 +1,6 @@
 // src/pages/HomePage.tsx
 import { useNavigate } from 'react-router-dom'
-import { format, startOfDay, subDays } from 'date-fns'
+import { format, startOfDay, subDays, startOfWeek } from 'date-fns'
 import { useMemo, useState } from 'react'
 import { Play, QrCode, LayoutTemplate, History, TrendingUp, ChevronRight, Dumbbell, Moon, CheckCircle2, Circle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -34,9 +34,26 @@ export function HomePage() {
   const todayIdx = new Date().getDay()
   const todayTemplateId = profile?.weekSchedule?.[todayIdx]
   const todayTemplate = templates.find((t) => t.id === todayTemplateId)
-  const isActive = profile?.activeTemplateId === todayTemplateId && !!todayTemplateId
+  // Resume only when actually mid-session (exerciseIndex > 0)
+  const isActive = profile?.activeTemplateId === todayTemplateId &&
+    !!todayTemplateId &&
+    (profile?.activeTemplateExerciseIndex ?? 0) > 0
 
   const recentWorkouts = workoutHistory.slice(0, 5)
+
+  const thisWeekWorkoutCount = useMemo(() => {
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+    const uniqueDays = new Set(
+      workoutHistory
+        .filter((w) => new Date(w.date) >= weekStart)
+        .map((w) => startOfDay(new Date(w.date)).getTime()),
+    )
+    return uniqueDays.size
+  }, [workoutHistory])
+
+  const weeklyScheduledDays = useMemo(() => {
+    return Object.keys(profile?.weekSchedule ?? {}).length
+  }, [profile?.weekSchedule])
 
   const streak = useMemo(() => {
     if (workoutHistory.length === 0) return 0
@@ -220,17 +237,27 @@ export function HomePage() {
             )}
           </>
         ) : (
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted">
-              <Moon className="h-5 w-5 text-muted-foreground" />
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted">
+                <Moon className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold">Rest Day</p>
+                <p className="text-xs text-muted-foreground">No workout scheduled. Recover well.</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate('/templates')}>
+                Schedule
+              </Button>
             </div>
-            <div className="flex-1">
-              <p className="font-semibold">Rest Day</p>
-              <p className="text-xs text-muted-foreground">No workout scheduled. Recover well.</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate('/templates')}>
-              Schedule
-            </Button>
+            {weeklyScheduledDays > 0 && (
+              <div className="flex items-center justify-between rounded-xl bg-muted/50 px-3 py-2.5">
+                <p className="text-xs text-muted-foreground">This week</p>
+                <p className="text-xs font-semibold">
+                  {thisWeekWorkoutCount} / {weeklyScheduledDays} days done
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

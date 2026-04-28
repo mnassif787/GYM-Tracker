@@ -151,8 +151,10 @@ export function TemplatesPage() {
     await saveWeekSchedule(weekSchedule)
   }
 
-  function handleAutoAssign() {
-    setWeekSchedule(buildSmartWeekSchedule(templates, exercises, daysPerWeek))
+  async function handleAutoAssign() {
+    const newSchedule = buildSmartWeekSchedule(templates, exercises, daysPerWeek)
+    setWeekSchedule(newSchedule)
+    await saveWeekSchedule(newSchedule)
   }
 
   async function handleDelete(id: string) {
