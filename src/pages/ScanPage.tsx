@@ -209,17 +209,60 @@ export function ScanPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-6 page-transition">
+    <div className="mx-auto max-w-md px-4 py-6 pb-32 page-transition">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Scan</h1>
+        <h1 className="text-2xl font-bold">Exercises</h1>
         <p className="text-sm text-muted-foreground">
-          Point your camera at a gym machine QR code
+          Browse exercises or scan a machine QR code
         </p>
       </div>
 
       {!scannedExercise ? (
         <div className="flex flex-col gap-6">
-          <Scanner onScanSuccess={handleScanSuccess} onUnknownCode={handleUnknownCode} />
+          {/* Primary action: Browse all exercises - big button */}
+          <Button 
+            size="lg"
+            className="w-full h-14"
+            onClick={() => setBrowseOpen(true)}
+          >
+            <Search className="mr-2 h-5 w-5" />
+            Browse All Exercises
+          </Button>
+
+          {/* Recent exercises - quick access */}
+          {recentExercises.length > 0 && (
+            <div>
+              <p className="mb-2.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Recent
+              </p>
+              <div className="flex flex-col gap-2">
+                {recentExercises.map((ex) => (
+                  <button
+                    key={ex.id}
+                    onClick={() => handlePickExercise(ex)}
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-left transition-all active:scale-[0.98] hover:border-primary/20 hover:bg-accent/30"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted">
+                      <Dumbbell className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{ex.name}</p>
+                      <p className="text-xs text-muted-foreground">{ex.targetMuscles.join(', ')}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Secondary: QR Scanner - collapsible/less prominent */}
+          <div className="border-t border-border pt-6">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground text-center">
+              Or Scan QR Code
+            </p>
+            <Scanner onScanSuccess={handleScanSuccess} onUnknownCode={handleUnknownCode} />
+          </div>
 
           {/* Admin access (hidden until tapped — ghost button) */}
           {!isAdminMode && (
@@ -247,39 +290,6 @@ export function ScanPage() {
               </Button>
             </div>
           )}
-
-          {/* Recent exercises */}
-          {recentExercises.length > 0 && (
-            <div>
-              <p className="mb-2.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Recent
-              </p>
-              <div className="flex flex-col gap-2">
-                {recentExercises.map((ex) => (
-                  <button
-                    key={ex.id}
-                    onClick={() => handlePickExercise(ex)}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3.5 text-left transition-all active:scale-[0.98] hover:border-primary/20 hover:bg-accent/30"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted">
-                      <Dumbbell className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate">{ex.name}</p>
-                      <p className="text-xs text-muted-foreground">{ex.targetMuscles.join(', ')}</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Browse all */}
-          <Button variant="outline" className="w-full" onClick={() => setBrowseOpen(true)}>
-            <Search className="mr-2 h-4 w-4" />
-            Browse All Exercises
-          </Button>
         </div>
       ) : (
         /* ── Exercise Result Card ── */

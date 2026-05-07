@@ -1,7 +1,7 @@
 ﻿// src/pages/LogPage.tsx
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { QrCode, CheckCircle2, Play, Clock, AlertTriangle, Shuffle, LayoutTemplate, Calculator, ListOrdered, Trophy, Timer } from 'lucide-react'
+import { QrCode, CheckCircle2, Play, Clock, AlertTriangle, Shuffle, LayoutTemplate, Calculator, ListOrdered, Trophy, Timer, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +15,7 @@ import { WorkoutForm } from '@/components/WorkoutForm'
 import { RestTimer } from '@/components/RestTimer'
 import { useWorkout } from '@/context/WorkoutContext'
 import { getAlternativeExercises } from '@/lib/exercises'
+import { QuickExerciseGrid } from '@/components/QuickExerciseGrid'
 
 // â”€â”€â”€ Session countdown timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function SessionTimer({
@@ -356,20 +357,68 @@ export function LogPage() {
   // â”€â”€â”€ No active workout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (!currentExercise || !currentWorkout) {
     return (
-      <div className="mx-auto max-w-md px-4 py-12 text-center page-transition">
-        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-muted">
-          <QrCode className="h-10 w-10 text-muted-foreground" />
+      <div className="mx-auto max-w-md px-4 py-6 pb-32 page-transition space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+            <QrCode className="h-8 w-8 text-primary" />
+          </div>
+          <h2 className="text-xl font-bold">Ready to Start?</h2>
+          <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">
+            Pick a recent exercise or browse all exercises to begin logging
+          </p>
         </div>
-        <h2 className="text-xl font-bold">No Active Workout</h2>
-        <p className="mt-2 text-sm text-muted-foreground max-w-[240px] mx-auto">
-          Scan a QR code on a gym machine to start logging sets.
-        </p>
-        <Button className="mt-7 w-full" size="lg" onClick={() => navigate('/scan')}>
-          Go to Scanner
-        </Button>
-        <Button variant="outline" className="mt-3 w-full" size="lg" onClick={() => navigate('/templates')}>
-          <LayoutTemplate className="h-4 w-4 mr-2" /> Start from a Template
-        </Button>
+
+        {/* Quick Start Buttons */}
+        <div className="grid grid-cols-2 gap-3">
+          <Button 
+            className="h-auto py-4 flex-col gap-2" 
+            onClick={() => navigate('/scan')}
+          >
+            <QrCode className="h-5 w-5" />
+            <span className="text-xs">Scan QR</span>
+          </Button>
+          <Button 
+            variant="outline"
+            className="h-auto py-4 flex-col gap-2"
+            onClick={() => navigate('/templates')}
+          >
+            <LayoutTemplate className="h-5 w-5" />
+            <span className="text-xs">Templates</span>
+          </Button>
+        </div>
+
+        {/* Recent Exercises Grid */}
+        {workoutHistory.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Continue Where You Left Off
+              </p>
+            </div>
+            <QuickExerciseGrid
+              exercises={exercises}
+              workoutHistory={workoutHistory}
+              onStartExercise={(exercise) => {
+                startWorkout(exercise)
+              }}
+              maxItems={6}
+              showViewAll={true}
+            />
+          </div>
+        )}
+
+        {/* Empty state for first-time users */}
+        {workoutHistory.length === 0 && (
+          <Card className="p-6 text-center space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Start your first workout by scanning a machine QR code or browsing exercises
+            </p>
+            <Button onClick={() => navigate('/scan')} className="w-full">
+              <Plus className="h-4 w-4 mr-2" /> Browse Exercises
+            </Button>
+          </Card>
+        )}
       </div>
     )
   }

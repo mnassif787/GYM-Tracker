@@ -2,11 +2,12 @@
 import { useNavigate } from 'react-router-dom'
 import { format, startOfDay, subDays, startOfWeek } from 'date-fns'
 import { useMemo, useState } from 'react'
-import { Play, QrCode, LayoutTemplate, History, TrendingUp, ChevronRight, Dumbbell, Moon, CheckCircle2, Circle, X } from 'lucide-react'
+import { Play, QrCode, LayoutTemplate, History, TrendingUp, ChevronRight, Dumbbell, Moon, CheckCircle2, Circle, X, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useWorkout } from '@/context/WorkoutContext'
 import { cn } from '@/lib/utils'
+import { QuickExerciseGrid } from '@/components/QuickExerciseGrid'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -28,7 +29,7 @@ export function HomePage() {
   const navigate = useNavigate()
   const {
     profile, templates, exercises, workoutHistory,
-    startTemplate, resumeActiveTemplate,
+    startTemplate, resumeActiveTemplate, startWorkout,
   } = useWorkout()
 
   const todayIdx = new Date().getDay()
@@ -171,6 +172,36 @@ export function HomePage() {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Quick Log Section - Recent Exercises for Fast Access */}
+      {workoutHistory.length > 0 && !showOnboarding && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-primary" />
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Quick Log
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/scan')}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View all
+            </button>
+          </div>
+          <QuickExerciseGrid
+            exercises={exercises}
+            workoutHistory={workoutHistory}
+            onStartExercise={(exercise) => {
+              startWorkout(exercise)
+              navigate('/log')
+            }}
+            maxItems={4}
+            showViewAll={false}
+          />
         </div>
       )}
 
